@@ -5,8 +5,8 @@ Here we train an RL model to decide if it should sell the stored electricity or 
 # Contents
 - [x] `data` contains training and validation data in .xlsx format
 - `models` stores approaches we use:
-  - [ ] interface for approaches
-  - [ ] baseline approach (sell when you have something to sell and price is higher than threshold, buy when price is lower than other threshold)
+  - [x] interface for approaches
+  - [x] baseline approach (sell when you have something to sell and price is higher than threshold, buy when price is lower than other threshold)
   - [ ] DQN
   - [ ] tabular method
 - [ ] `results` will store the reports
@@ -16,8 +16,10 @@ Here we train an RL model to decide if it should sell the stored electricity or 
 # Contributions
 - Andrey
   1. EDA
-  2. ToDo
+  2. Baseline model
+  3. ToDo
 - Jutte
   1. ToDo
 - Kenji
-  1. ToDo
+  1. Report
+  2. ToDo
