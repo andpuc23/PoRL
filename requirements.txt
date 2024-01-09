@@ -2,3 +2,4 @@ pandas==2.1.4
 openpyxl>=3.0.10
 numexpr>=2.8.0
 matplotlib==3.4.3
+numpy==1.26.3
