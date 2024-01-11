@@ -5,14 +5,9 @@ import pandas as pd
 class BaselineModel(Model):
     def __init__(self, data:pd.DataFrame):
         super().__init__(self)
-        data_cols = sorted([c for c in data.columns if c.startswith('Hour')])
-        assert len(data_cols) == 24, f"number of hours in a day should be 24, got {len(data_cols)}"
 
-        lower_thres = []
-        higher_thres = []
-        for col in data_cols:
-            lower_thres.append(np.quantile(data[col], 0.25))
-            higher_thres.append(np.quantile(data[col], 0.75))
+        self.lower_thres = np.quantile(data.Price.values, 0.25)
+        self.higher_thres = np.quantile(data.Price.values, 0.75)
     
 
     def predict(self, data):
@@ -21,7 +16,7 @@ class BaselineModel(Model):
         if self.lower_thres < last_price < self.higher_thres:
             action = 25 # do nothing
         elif self.lower_thres > last_price:
-            action = 51 # buy cheap
+            action = 50 # buy cheap
         else:
             action = 0 # sell expensive
 

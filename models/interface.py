@@ -8,8 +8,7 @@ class Model(ABC):
     def train(self, data):
         """
         trains the model inside
-        input: pd.DataFrame of 3 columns: date, price value and summer_delta - distance to July
-
+        input: pd.DataFrame of 4 columns: ['Price', 'Summer_delta', 'Weekday', 'Hour']
         """
         pass
 
@@ -20,8 +19,8 @@ class Model(ABC):
         Here we expect some previous observations to make a decision on 
 
         returns int encoding a decision
-        0 for idle
-        -1 for sell
-        1 for buy
+        25 for idle
+        0-24 for sell
+        26-50 for buy
         """
         pass
