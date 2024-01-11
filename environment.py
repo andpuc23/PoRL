@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 from gym import spaces
 import numpy as np
 import time
@@ -7,7 +7,7 @@ import time
 import random
 from numpy.random import default_rng
 
-class Environment(gym.env):
+class Environment(gym.Env):
     def __init__(self, data):
         super().__init__()
 
@@ -18,11 +18,13 @@ class Environment(gym.env):
         self.morning_capacity = 20 #kWh
         self.rng = default_rng()
         self.battery_valuation = 1000
+        self.min_price = 0
+        self.max_price = 10000
     
         #Define action space
         # 0-24 sell
         # 25 nothing
-        # 26-51 buy
+        # 26-50 buy
         self.action_space = spaces.Discrete(51)
         
         #Define observation space
@@ -31,14 +33,14 @@ class Environment(gym.env):
         self.observation_space = spaces.Dict({
             'battery': spaces.Box(low=0, high=self.max_capacity, shape=(1,), dtype=np.float32),
             'hour': spaces.Discrete(24),
-            'price': spaces.Box(low=self.min_price, high=self.max_price),
+            'price': spaces.Box(low=self.min_price, high=self.max_price, dtype=np.float32),
             'availability': spaces.Discrete(2)  # 0: available, 1: unavailable
         })
         
         self.state = {
             'battery': self.morning_capacity,
             'hour': 0,
-            'price': data.loc[data['day'] == self.t, 'price'].values,
+            'price': data.loc[data['day'] == 0, 'price'].values,
             'availability': random.randint(0,1)
         }
     
@@ -47,11 +49,11 @@ class Environment(gym.env):
         self.state = {
             'battery': self.morning_capacity,
             'hour': 8,
-            'price': data.loc[data['day'] == self.t, 'price'].values,
+            'price': data.loc[data['day'] == 0, 'price'].values,
             'availability': random.randint(0,1)
         }
         
-        return self.state, reward, done  
+        return self.state, 0
     
     def step(self, action):
         value_battery = self.state['battery']*self.battery_valuation
@@ -67,9 +69,3 @@ class Environment(gym.env):
         self.state['availability'] = random.randint(0,1)
         
         return self.state, reward
-    
-    def render(self):
-        pass
-    
-    def close(self):
-        pass
