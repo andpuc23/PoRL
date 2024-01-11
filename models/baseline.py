@@ -4,8 +4,6 @@ import pandas as pd
 
 class BaselineModel(Model):
     def __init__(self, data:pd.DataFrame):
-        super().__init__(self)
-
         self.lower_thres = np.quantile(data.Price.values, 0.25)
         self.higher_thres = np.quantile(data.Price.values, 0.75)
     

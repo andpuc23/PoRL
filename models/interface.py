@@ -2,9 +2,6 @@ from abc import ABC
 
 
 class Model(ABC):
-    def __init__(self):
-        pass
-
     def train(self, data):
         """
         trains the model inside
