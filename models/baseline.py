@@ -19,11 +19,11 @@ class BaselineModel(Model):
         last_row = data.iloc[-1]
         last_price = last_row.Price
         if self.lower_thres < last_price < self.higher_thres:
-            action = 0 # do nothing
+            action = 25 # do nothing
         elif self.lower_thres > last_price:
-            action = 1 # buy cheap
+            action = 51 # buy cheap
         else:
-            action = -1 # sell expensive
+            action = 0 # sell expensive
 
         return action
     
