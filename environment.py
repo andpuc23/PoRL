@@ -31,21 +31,21 @@ class Environment(gym.Env):
         # battery, hour, price, availability
         
         self.observation_space = spaces.Dict({
-            't': data.length,
+            't': spaces.Discrete(len(data))
             'battery': spaces.Box(low=0, high=self.max_capacity, shape=(1,), dtype=np.float32),
             'hour': spaces.Discrete(24),
             'price': spaces.Box(low=self.min_price, high=self.max_price, dtype=np.float32),
-            'availability': spaces.Discrete(2),  # 0: available, 1: unavailable
+            'availability': spaces.Discrete(2),  # 0: unavailable, 1: available
             'distance_summer': spaces.Discrete(6)
         })
         
         self.state = {
-            't': 1,
+            't': 0,
             'battery': self.morning_capacity,
-            'hour': 1,
-            'price': data.loc[1, 'price'],
-            'availability': random.randint(0,1),
-            'distance_summer': data.loc[1, 'Summer_delta']
+            'hour': 0,
+            'price': data.loc[data['t'] == 0, 'price'],
+            'availability': data.loc[data['t'] == 0, 'Available'],
+            'distance_summer': data.loc[data['t'] == 0, 'Summer_delta']
         }
     
     def reset(self, data):
@@ -54,9 +54,9 @@ class Environment(gym.Env):
             't': 8,
             'battery': self.morning_capacity,
             'hour': 8,
-            'price': data.loc[8, 'price'],
-            'availability': random.randint(0,1),
-            'distance_summer': data.loc[8, 'Summer_delta']
+            'price': data.loc[data['t'] == 8, 'price'],
+            'availability': data.loc[data['t'] == 8, 'Available'],
+            'distance_summer': data.loc[data['t'] == 8, 'Summer_delta']
         }
         
         return self.state, 0
@@ -69,18 +69,18 @@ class Environment(gym.Env):
         
         self.state['battery'] += (action-25)*self.efficiency
 
-        if self.state['hour'] == 24:
+        if self.state['hour'] == 23:
             self.state['hour'] = 0
         else:
             self.state['hour'] +=1
 
         self.state['t']  += 1
 
-        self.state['price'] = data.loc[self.state['t'], 'price']
+        self.state['price'] = data.loc[data['t'] == self.state['t'], 'price']
 
-        self.state['availablity'] = random.randint(0,1)
+        self.state['availablity'] = data.loc[data['t'] == self.state['t'], 'Available']
 
-        self.state['distance_summer'] = data.loc[self.state['t'], 'Summer_delta']
+        self.state['distance_summer'] = data.loc[data['t'] == self.state['t'], 'Summer_delta']
 
         
 
