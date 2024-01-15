@@ -5,13 +5,11 @@ import time
 import matplotlib.pyplot as plt
 import time
 import random
-from numpy.random import default_rng
 
 class Environment(gym.Env):
     def __init__(self, data):
         super().__init__()
 
-        
         self.data = data
         self.max_capacity = 50 #kWh
         self.efficiency = 0.9
@@ -43,7 +41,7 @@ class Environment(gym.Env):
             't': 0,
             'battery': self.morning_capacity,
             'hour': 0,
-            'price': data.loc[data['t'] == 0, 'price'],
+            'price': data.iloc[0]['Price'],
             'availability': data.loc[data['t'] == 0, 'Available'],
             'distance_summer': data.loc[data['t'] == 0, 'Summer_delta']
         }
@@ -51,12 +49,12 @@ class Environment(gym.Env):
     def reset(self, data):
         # Reset the environment to the initial state
         self.state = {
-            't': 8,
+            't': 0, #is not the same as hour, it is the index of the data
             'battery': self.morning_capacity,
-            'hour': 8,
-            'price': data.loc[data['t'] == 8, 'price'],
-            'availability': data.loc[data['t'] == 8, 'Available'],
-            'distance_summer': data.loc[data['t'] == 8, 'Summer_delta']
+            'hour': 0,
+            'price': data.iloc[0]['Price'], 
+            'availability': data.loc[data['t'] == 0, 'Available'],
+            'distance_summer': data.loc[data['t'] == 0, 'Summer_delta']
         }
         
         return self.state, 0
@@ -69,20 +67,16 @@ class Environment(gym.Env):
         else: #do nothing
             reward = 0
         
-        self.state['battery'] += (action-25)*self.efficiency
-
+        self.state['battery'] += min([(action-25)*self.efficiency, 25])
+        
         if self.state['hour'] == 23:
             self.state['hour'] = 0
         else:
             self.state['hour'] +=1
-
-        self.state['t']  += 1
-
-        self.state['price'] = data.loc[data['t'] == self.state['t'], 'price']
-
+            
+        self.state['t'] += 1
+        self.state['price'] = data.loc[data['t'] == self.state['t'], 'Price']
         self.state['availability'] = data.loc[data['t'] == self.state['t'], 'Available']
-
         self.state['distance_summer'] = data.loc[data['t'] == self.state['t'], 'Summer_delta']
-        
 
         return self.state, reward
