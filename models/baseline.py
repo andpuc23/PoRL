@@ -13,12 +13,10 @@ class BaselineModel(Model):
         if self.lower_thres < last_price < self.higher_thres:
             action = 25 # do nothing
         elif self.lower_thres > last_price:
-            action = 50 # buy 25 cheap
+            action = min([25 + state['battery'], 50]) # buy max 25 cheap
         else:
-            action = 0 # sell 25 expensive  
-
+            action = max([25 - state['battery'], 0]) # sell max 25 expensive  
         return action
-    
     
     def train(self, data):
         pass

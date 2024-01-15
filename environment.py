@@ -67,7 +67,7 @@ class Environment(gym.Env):
         else: #do nothing
             reward = 0
         
-        self.state['battery'] += min([(action-25)*self.efficiency, 25])
+        self.state['battery'] += (action-25)*self.efficiency
         
         if self.state['hour'] == 23:
             self.state['hour'] = 0
