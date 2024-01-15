@@ -11,12 +11,12 @@ class Environment(gym.Env):
     def __init__(self, data):
         super().__init__()
 
+        
         self.data = data
         self.max_capacity = 50 #kWh
         self.efficiency = 0.9
         self.power = 25 #kW
         self.morning_capacity = 20 #kWh
-        self.rng = default_rng()
         self.battery_valuation = 20
         self.min_price = 0
         self.max_price = 10000
@@ -31,12 +31,12 @@ class Environment(gym.Env):
         # battery, hour, price, availability
         
         self.observation_space = spaces.Dict({
-            't': spaces.Discrete(len(data))
+            't': spaces.Discrete(len(data)),
             'battery': spaces.Box(low=0, high=self.max_capacity, shape=(1,), dtype=np.float32),
             'hour': spaces.Discrete(24),
             'price': spaces.Box(low=self.min_price, high=self.max_price, dtype=np.float32),
             'availability': spaces.Discrete(2),  # 0: unavailable, 1: available
-            'distance_summer': spaces.Discrete(6)
+            'distance_summer': spaces.Discrete(6) # distance in months
         })
         
         self.state = {
@@ -66,6 +66,8 @@ class Environment(gym.Env):
             reward = -(action-25)*self.efficiency*(self.battery_valuation - self.state['price'])
         elif action > 25: #buy
             reward = 2*(action-25)*self.efficiency*(self.battery_valuation - self.state['price'])
+        else: #do nothing
+            reward = 0
         
         self.state['battery'] += (action-25)*self.efficiency
 
@@ -78,10 +80,9 @@ class Environment(gym.Env):
 
         self.state['price'] = data.loc[data['t'] == self.state['t'], 'price']
 
-        self.state['availablity'] = data.loc[data['t'] == self.state['t'], 'Available']
+        self.state['availability'] = data.loc[data['t'] == self.state['t'], 'Available']
 
         self.state['distance_summer'] = data.loc[data['t'] == self.state['t'], 'Summer_delta']
-
         
 
         return self.state, reward
