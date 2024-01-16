@@ -11,9 +11,9 @@ class BaselineModel(Model):
         last_price = data.iloc[state['t']]['Price']
         
         if self.lower_thres > last_price:
-            action = min([25 + (50-state['battery']), 50]) # buy max 25 cheap
+            action = min([np.floor(25 + (50-state['battery'])), 50]) # buy max 25 cheap
         elif self.higher_thres < last_price:
-            action = max([25-state['battery'], 0]) # sell max 25 expensive 
+            action = max([np.ceil(25-state['battery']/0.9), 0]) # sell max 25 expensive 
         else:
             action = 25 # do nothing
             
