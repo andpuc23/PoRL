@@ -23,7 +23,6 @@ class BaselineModel(Model):
         if state['battery'] < 20 and state['hour']==7:
             # action will at least be to charge up to 20 and possibly the action determined above
             action = max([action, 25+(20-state['battery'])])
-            print(state['battery'], state['hour'])
         
         return action
     
