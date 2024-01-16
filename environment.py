@@ -61,14 +61,10 @@ class Environment(gym.Env):
     
     def step(self, action, data):
         if action < 25: #sell
-            # action is netto removal from battery, you sell 22.5 and remove 25 from battery
-            # i removed the minus, someone should check
-            reward = (action-25)*self.efficiency*(self.battery_valuation - self.state['price'])
-            self.state['battery'] += (action-25)
+            reward = (action-25)*(self.battery_valuation - self.state['price'])
+            self.state['battery'] += (action-25)/self.efficiency
             
         elif action > 25: #buy
-            #action is netto addition to battery, you buy 27.77 and get 25 in battery
-            
             reward = 2*(action-25)/self.efficiency*(self.battery_valuation - self.state['price'])
             self.state['battery'] += (action-25)
             
