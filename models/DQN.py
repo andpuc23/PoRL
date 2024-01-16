@@ -36,10 +36,10 @@ class DQN(nn.Module):
         self.layers = nn.Sequential(
             nn.Linear(n_observations, 128),
             nn.ReLU(),
-            nn.Linear(128, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
+            # nn.Linear(128, 256),
+            # nn.ReLU(),
+            # nn.Linear(256, 128),
+            # nn.ReLU(),
             nn.Linear(128, n_actions)
         )
 
@@ -60,7 +60,7 @@ class DQNModel(Model):
                  eps_decay:float=1000, #higher is slower
                  tau:float=.005,
                  lr:float=1e-4,
-                 replay_capasity:int=1e5):
+                 replay_capasity:int=int(1e5)):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.env = env
         self.n_actions = self.env.action_space.n
@@ -73,8 +73,8 @@ class DQNModel(Model):
         self.tau = tau
         self.lr = lr
 
-        state, info = self.env.reset()
-        n_observations = len(state)
+        observation, _ = self.env.reset()
+        n_observations = len(observation)
 
         self.policy_net = DQN(n_observations, self.n_actions).to(self.device)
         self.target_net = DQN(n_observations, self.n_actions).to(self.device)
@@ -133,19 +133,20 @@ class DQNModel(Model):
 
 
     def train(self, num_episodes=100):
-        if num_episodes == 100 and torch.cuda.is_available():
-            num_episodes = 1000
-        else:
-            num_episodes = 100
-
+        if num_episodes == 100:
+            if  torch.cuda.is_available():
+                num_episodes = 1000
+            else:
+                num_episodes = 100
+        print('training on', 'cuda' if torch.cuda.is_available() else 'cpu')
 
         for i_episode in tqdm(range(num_episodes)):
             
             state, info = self.env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-            for t in count():
+            for t in tqdm(count()):
                 action = self.__select_action(state)
-                observation, reward = self.env.step(action.item()) # check return type
+                observation, reward, done = self.env.step(action.item())
                 reward = torch.tensor([reward], device=self.device)
             
                 next_state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -161,6 +162,9 @@ class DQNModel(Model):
                 for key in policy_net_state_dict:
                     target_net_state_dict[key] = policy_net_state_dict[key]*self.tau + target_net_state_dict[key]*(1-self.tau)
                 self.target_net.load_state_dict(target_net_state_dict)
+
+                if done:
+                    break
 
 
         print('Done training')
