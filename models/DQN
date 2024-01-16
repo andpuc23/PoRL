@@ -1,0 +1,105 @@
+from models import Model
+
+import gymnasium as gym
+import random
+import math
+from collections import namedtuple, deque
+from itertools import count
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+
+Transition = namedtuple('Transition',
+                        ('state', 'action', 'next_state', 'reward'))
+
+
+class ReplayMemory:
+
+    def __init__(self, capacity):
+        self.memory = deque([], maxlen=capacity)
+
+    def push(self, *args):
+        """Save a transition"""
+        self.memory.append(Transition(*args))
+
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
+
+    def __len__(self):
+        return len(self.memory)
+
+
+class DQN(nn.Module):
+    def __init__(self, n_observations, n_actions):
+        super(DQN, self).__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(n_observations, 128),
+            nn.ReLU(),
+            nn.Linear(128, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, n_actions)
+        )
+
+
+    # Called with either one element to determine next action, or a batch
+    # during optimization. Returns tensor([[left0exp,right0exp]...]).
+    def forward(self, x):
+        return self.layers(x)
+        
+
+class DQNModel(Model):
+    def __init__(self,
+                 env,
+                 batch_size:int=128,
+                 gamma:float=.99,
+                 eps_start:float=.9,
+                 eps_end:float=.05,
+                 eps_decay:float=1000, #higher is slower
+                 tau:float=.005,
+                 lr:float=1e-4,
+                 replay_capasity:int=1e5):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.env = env
+        self.n_actions = self.env.action_space.n
+    
+        self.batch_size=batch_size
+        self.gamma = gamma
+        self.eps_start = eps_start
+        self.eps_end = eps_end
+        self.eps_decay = eps_decay
+        self.tau = tau
+        self.lr = lr
+
+        state, info = self.env.reset()
+        n_observations = len(state)
+
+        self.policy_net = DQN(n_observations, self.n_actions).to(device)
+        self.target_net = DQN(n_observations, self.n_actions).to(device)
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+
+        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=lr, amsgrad=True)
+        self.memory = ReplayMemory(replay_capasity)
+
+        self.steps_done = 0
+
+
+    def __select_action(self, state):
+        sample = random.random()
+        eps_threshold = self.eps_end + (self.eps_start - self.eps_end)*\
+            math.exp(-1. * self.steps_done / self.eps_decay)
+        selfsteps_done += 1
+        if sample > eps_threshold:
+            with torch.no_grad():
+                # t.max(1) will return the largest column value of each row.
+                # second column on max result is index of where max element was
+                # found, so we pick action with the larger expected reward.
+                return self.policy_net(state).max(1).indices.view(1, 1)
+        else:
+            return torch.tensor([[self.env.action_space.sample()]], device=device, dtype=torch.long)
+
+    def train():
+        
