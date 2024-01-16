@@ -11,7 +11,6 @@ class Environment(gym.Env):
     def __init__(self, data):
         super().__init__()
         
-        
         self.data = data
         self.max_capacity = 50 #kWh
         self.efficiency = 0.9
@@ -43,33 +42,33 @@ class Environment(gym.Env):
             't': 0,
             'battery': self.morning_capacity,
             'hour': 0,
-            'price': data.loc[data['t'] == 0, 'price'],
-            'availability': data.loc[data['t'] == 0, 'Available'],
-            'distance_summer': data.loc[data['t'] == 0, 'Summer_delta']
+            'price': data.iloc[0]['Price'],
+            'availability': data.iloc[0]['Available'],
+            'distance_summer': data.iloc[0]['Summer_delta']
         }
     
     def reset(self):
         # Reset the environment to the initial state
         self.state = {
-            't': 8,
+            't': 0,
             'battery': self.morning_capacity,
-            'hour': 8,
-            'price': self.data.loc[self.data['t'] == 8, 'price'],
-            'availability': self.data.loc[self.data['t'] == 8, 'Available'],
-            'distance_summer': self.data.loc[self.data['t'] == 8, 'Summer_delta']
+            'hour': 0,
+            'price': self.data.iloc[0]['Price'],
+            'availability': self.data.iloc[0]['Available'],
+            'distance_summer': self.data.iloc[0]['Summer_delta']
         }
         
         return self.state, 0
     
     def step(self, action):
         if action < 25: #sell
-            reward = -(action-25)*self.efficiency*(self.battery_valuation - self.state['price'])
+            reward = (action-25)*(self.battery_valuation - self.state['price'])
+            self.state['battery'] += (action-25)/self.efficiency
         elif action > 25: #buy
-            reward = 2*(action-25)*self.efficiency*(self.battery_valuation - self.state['price'])
+            reward = 2*(action-25)/self.efficiency*(self.battery_valuation - self.state['price'])
+            self.state['battery'] += (action-25)
         else: #do nothing
             reward = 0
-        
-        self.state['battery'] += (action-25)*self.efficiency
 
         if self.state['hour'] == 23:
             self.state['hour'] = 0
@@ -77,12 +76,8 @@ class Environment(gym.Env):
             self.state['hour'] +=1
 
         self.state['t']  += 1
-
-        self.state['price'] = self.data.loc[self.data['t'] == self.state['t'], 'price']
-
-        self.state['availability'] = self.data.loc[self.data['t'] == self.state['t'], 'Available']
-
-        self.state['distance_summer'] = self.data.loc[self.data['t'] == self.state['t'], 'Summer_delta']
-        
+        self.state['price'] = self.data.iloc[self.state['t']]['Price']
+        self.state['availability'] = self.data.iloc[self.state['t']]['Available']
+        self.state['distance_summer'] = self.data.iloc[self.state['t']]['Summer_delta']
 
         return self.state, reward
