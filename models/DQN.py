@@ -1,10 +1,10 @@
-from models import Model
+from models.interface import Model
 
-import gymnasium as gym
 import random
 import math
 from collections import namedtuple, deque
 from itertools import count
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -109,8 +109,7 @@ class DQNModel(Model):
         
         non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
                                             batch.next_state)), device=self.device, dtype=torch.bool)
-        non_final_next_states = torch.cat([s for s in batch.next_state
-                                                    if s is not None])
+        non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
         state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
@@ -132,10 +131,7 @@ class DQNModel(Model):
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
 
-        if torch.cuda.is_available():
-            num_episodes = 1000
-        else:
-            num_episodes = 100
+
     def train(self, num_episodes=100):
         if num_episodes == 100 and torch.cuda.is_available():
             num_episodes = 1000
@@ -143,42 +139,29 @@ class DQNModel(Model):
             num_episodes = 100
 
 
-        for i_episode in range(num_episodes):
+        for i_episode in tqdm(range(num_episodes)):
             
             state, info = self.env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             for t in count():
                 action = self.__select_action(state)
-                observation, reward, terminated, truncated, _ = self.env.step(action.item()) # check return type
+                observation, reward = self.env.step(action.item()) # check return type
                 reward = torch.tensor([reward], device=self.device)
-                done = terminated or truncated
+            
+                next_state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
 
-                if terminated:
-                    next_state = None
-                else:
-                    next_state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
-
-                # Store the transition in memory
                 self.memory.push(state, action, next_state, reward)
 
-                # Move to the next state
                 state = next_state
 
-                # Perform one step of the optimization (on the policy network)
                 self._train_one_epoch()
 
-                # Soft update of the target network's weights
-                # θ′ ← τ θ + (1 −τ )θ′
                 target_net_state_dict = self.target_net.state_dict()
                 policy_net_state_dict = self.policy_net.state_dict()
                 for key in policy_net_state_dict:
                     target_net_state_dict[key] = policy_net_state_dict[key]*self.tau + target_net_state_dict[key]*(1-self.tau)
                 self.target_net.load_state_dict(target_net_state_dict)
 
-                # if done:
-                #     episode_durations.append(t + 1)
-                #     plot_durations()
-                #     break
 
         print('Done training')
     # plot_durations(show_result=True)
