@@ -8,10 +8,7 @@ class BaselineModel(Model):
         self.higher_thres = np.quantile(data.Price.values, 0.75)
         
     def predict(self, data, state):
-        last_row = data.iloc[-1]
-        #last_price = last_row.Price
-        t=state['t']
-        last_price = data.iloc[t]['Price']
+        last_price = data.iloc[state['t']]['Price']
         
         if self.lower_thres > last_price:
             action = min([25 + (50-state['battery']), 50]) # buy max 25 cheap
