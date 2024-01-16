@@ -143,10 +143,12 @@ class DQNModel(Model):
         for i_episode in tqdm(range(num_episodes)):
             
             state, info = self.env.reset()
+            state = list(state.values())
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             for t in tqdm(count()):
                 action = self.__select_action(state)
                 observation, reward, done = self.env.step(action.item())
+                observation = list(observation.values())
                 reward = torch.tensor([reward], device=self.device)
             
                 next_state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)

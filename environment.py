@@ -21,21 +21,21 @@ class Environment(gym.Env):
         self.max_price = 10000
     
         #Define action space
-        # 0-24 kWh sell
+        # 0-24 sell
         # 25 nothing
-        # 26-50 kWh buy
+        # 26-50 buy
         self.action_space = spaces.Discrete(51)
         
         #Define observation space
         # battery, hour, price, availability
         
         self.observation_space = spaces.Dict({
-            't': spaces.Discrete(len(data)),
+            # 't': spaces.Discrete(len(data)),
             'battery': spaces.Box(low=0, high=self.max_capacity, shape=(1,), dtype=np.float32),
             'hour': spaces.Discrete(24),
             'price': spaces.Box(low=self.min_price, high=self.max_price, dtype=np.float32, shape=(1,)),
             'availability': spaces.Discrete(2),  # 0: unavailable, 1: available
-            'distance_summer': spaces.Discrete(6) # distance in months
+            'distance_summer': spaces.Discrete(7) # distance in months
         })
         
         self.state = {
@@ -60,7 +60,7 @@ class Environment(gym.Env):
         
         observable_state = self.state.copy()
         del observable_state['t']
-        return list(observable_state.values()), 0
+        return observable_state, 0
     
     def step(self, action):
         if action < 25: #sell
@@ -86,4 +86,4 @@ class Environment(gym.Env):
         del observable_state['t']
         finished = self.state['t'] >= self.data.shape[0]-1
 
-        return list(observable_state.values()), reward, finished
+        return observable_state, reward, finished
