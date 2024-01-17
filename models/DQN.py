@@ -170,6 +170,16 @@ class DQNModel(Model):
 
 
         print('Done training')
-    # plot_durations(show_result=True)
-    # plt.ioff()
-    # plt.show()
+
+
+    def save_model(self, path:str):
+        torch.save(self.policy_net.state_dict(), path)
+
+    
+    def load_model(self, path:str):
+        self.policy_net.load_state_dict(torch.load(path))
+
+
+    def predict(self, state) -> int:
+        with torch.no_grad():
+            return self.policy_net(state).max(1).indices.view(1, 1)
