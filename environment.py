@@ -16,7 +16,7 @@ class Environment(gym.Env):
         self.efficiency = 0.9
         self.power = 25 #kW
         self.morning_capacity = 20 #kWh
-        self.battery_valuation = 20
+        self.battery_valuation = 40
         self.min_price = 0
         self.max_price = 10000
     
@@ -64,12 +64,16 @@ class Environment(gym.Env):
         return observable_state, 0
     
     def step(self, action):
-        if action < 25 and self.state['availability']==1: #sell
-            reward = (action-25)*(self.battery_valuation - self.state['price'])
+        if action < 25 and self.state['availability'] == 1: #sell
+            #reward = (action-25)*(self.battery_valuation - self.state['price'])
+            reward = (25-action)/self.efficiency*self.state['price']
             self.state['battery'] += (action-25)/self.efficiency
-        elif action > 25 and self.state['availability']==1: #buy
-            reward = 2*(action-25)/self.efficiency*(self.battery_valuation - self.state['price'])
+
+        elif action > 25 and self.state['availability'] == 1: #buy
+            #reward = 2*(action-25)/self.efficiency*(self.battery_valuation - self.state['price'])
+            reward = 2*(25-action)/self.efficiency*self.state['price']
             self.state['battery'] += (action-25)
+
         else: #do nothing
             reward = 0
         
