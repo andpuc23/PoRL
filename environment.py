@@ -76,6 +76,13 @@ class Environment(gym.Env):
 
         else: #do nothing
             reward = 0
+
+        if self.state['battery'] < 20 and self.state['hour']==7:
+            # action will at least be to charge up to 20 and possibly the action determined above
+            action = 25+(20-self.state['battery'])
+            reward += 2*(25-action)/self.efficiency*self.state['price']
+
+        
         
         if self.state['availability']==0:
             self.state['battery']-=2
