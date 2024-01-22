@@ -16,7 +16,7 @@ class BaselineModel(Model):
             action = max([25-(state['battery']*0.9), 0]) # sell max 25 expensive 
         else:
             action = 25 # do nothing
-            
+
         if state['battery'] < 20 and state['hour']==7:
             # action will at least be to charge up to 20 and possibly the action determined above
             action = max([action, 25+(20-state['battery'])])
