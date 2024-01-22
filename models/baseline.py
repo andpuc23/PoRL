@@ -3,24 +3,31 @@ import numpy as np
 import pandas as pd
 
 class BaselineModel(Model):
-    def __init__(self, data:pd.DataFrame, Min, Max):      
-        self.lower_thres = np.quantile(data.Price.values, Min)
-        self.higher_thres = np.quantile(data.Price.values, Max)
+    def __init__(self, env, Min, Max):      
+        self.lower_thres = np.quantile(env.price_values, Min)
+        self.higher_thres = np.quantile(env.price_values, Max)
+        print(self.lower_thres)
+        print(self.higher_thres)
         
-    def predict(self, state):
-        last_price = state['price']
-        
-        if self.lower_thres > last_price:
-            action = min([(25 + (50-state['battery'])), 50]) # buy max 25 cheap
-        elif self.higher_thres < last_price:
-            action = max([25-(state['battery']*0.9), 0]) # sell max 25 expensive 
+    def predict(self, env):
+        state = env.observation()
+        if (env.hour == 24):
+            current_day = env.day + 1
+            current_hour = 1
         else:
-            action = 25 # do nothing
+            current_day = env.day
+            current_hour = env.hour + 1
 
-        if state['battery'] < 20 and state['hour']==7:
-            # action will at least be to charge up to 20 and possibly the action determined above
-            action = max([action, 25+(20-state['battery'])])
-        
+
+        last_price = env.price_values[current_day-1][current_hour-1]
+
+        if self.lower_thres > last_price:
+            action = 1 # buy max 25 cheap
+        elif self.higher_thres < last_price:
+            action = -1 
+        else:
+            action = 0 # do nothing
+
         return action
     
     def train(self, data):
