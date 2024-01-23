@@ -125,5 +125,7 @@ class Electric_Car(gym.Env):
 
     def reset(self):
         self.counter = 0
-        self.hour = 0
+        self.hour = 1
+        self.day = 1
+        self.car_is_available = True
         return super().reset()
