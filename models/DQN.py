@@ -63,7 +63,7 @@ class DQNModel(Model):
                  replay_capasity:int=int(1e5)):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.env = env
-        self.n_actions = self.env.action_space.n
+        self.n_actions = 51
     
         self.batch_size = batch_size
         self.gamma = gamma
@@ -73,7 +73,7 @@ class DQNModel(Model):
         self.tau = tau
         self.lr = lr
 
-        observation, _ = self.env.reset()
+        observation = self.env.observation()
         n_observations = len(observation)
 
         self.policy_net = DQN(n_observations, self.n_actions).to(self.device)
@@ -98,14 +98,16 @@ class DQNModel(Model):
                 # found, so we pick action with the larger expected reward.
                 return self.policy_net(state).max(1).indices.view(1, 1)
         else:
-            return torch.tensor([[self.env.action_space.sample()]], device=self.device, dtype=torch.long)
+            return torch.rand(1)
+        # torch.tensor([[self.env.action_space.sample()]], device=self.device, dtype=torch.long)
 
     def _train_one_epoch(self):
         if len(self.memory) < self.batch_size:
             return
         transitions = self.memory.sample(self.batch_size)
-        batch = Transition(*zip(*transitions))
 
+
+        batch = Transition(*zip(*transitions))
         
         non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
                                             batch.next_state)), device=self.device, dtype=torch.bool)
@@ -124,31 +126,25 @@ class DQNModel(Model):
 
         criterion = nn.SmoothL1Loss()
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
-
+        running_loss = loss.item()
         self.optimizer.zero_grad()
         loss.backward()
         # In-place gradient clipping
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
-
+        return running_loss
 
     def train(self, num_episodes=100):
-        if num_episodes == 100:
-            if  torch.cuda.is_available():
-                num_episodes = 1000
-            else:
-                num_episodes = 100
         print('training on', 'cuda' if torch.cuda.is_available() else 'cpu')
-
+        
         for i_episode in tqdm(range(num_episodes)):
-            
-            state, info = self.env.reset()
-            state = list(state.values())
+            losses = []
+            state = self.env.observation()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             for t in tqdm(count()):
                 action = self.__select_action(state)
-                observation, reward, done = self.env.step(action.item())
-                observation = list(observation.values())
+                observation, reward, truncated, terminated, _ = self.env.step(action.item())
+                done = truncated or terminated
                 reward = torch.tensor([reward], device=self.device)
             
                 next_state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -157,7 +153,7 @@ class DQNModel(Model):
 
                 state = next_state
 
-                self._train_one_epoch()
+                losses.append(self._train_one_epoch())
 
                 target_net_state_dict = self.target_net.state_dict()
                 policy_net_state_dict = self.policy_net.state_dict()
@@ -167,7 +163,7 @@ class DQNModel(Model):
 
                 if done:
                     break
-
+                print(sum(losses)/len(losses) if None not in losses else 'None')
 
         print('Done training')
 
