@@ -6,6 +6,8 @@ from collections import namedtuple, deque
 from itertools import count
 from tqdm import tqdm
 
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -96,7 +98,7 @@ class DQNModel(Model):
                 # t.max(1) will return the largest column value of each row.
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
-                return self.policy_net(state).max(1).indices.view(1, 1)
+                return np.clip(self.policy_net(state).max(1).indices.view(1, 1),-1,1)
         else:
             return torch.rand(1)
         # torch.tensor([[self.env.action_space.sample()]], device=self.device, dtype=torch.long)
@@ -112,7 +114,7 @@ class DQNModel(Model):
         non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
                                             batch.next_state)), device=self.device, dtype=torch.bool)
         non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
-        state_batch = torch.cat(batch.state)
+        state_batch  = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
 

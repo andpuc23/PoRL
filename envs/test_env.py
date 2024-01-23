@@ -12,6 +12,7 @@ class Electric_Car(gym.Env):
         self.price_values = self.test_data.iloc[:, 1:25].to_numpy()
         self.timestamps = self.test_data['PRICES']
         self.state = np.empty(7)
+        self.observation_space = self.state
 
         # Battery characteristics
         self.battery_capacity = 50  # kWh
@@ -128,4 +129,4 @@ class Electric_Car(gym.Env):
         self.hour = 1
         self.day = 1
         self.car_is_available = True
-        return super().reset()
+        return self.state, 0
