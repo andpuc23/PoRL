@@ -176,18 +176,21 @@ class DDQNAgent:
 
     def play_game(self, env):
         rewards = []
+        actions = []
         done = False
-        
+        step = 0
         state, _ = env.reset()
         while not done:
         
-            action = self.choose_action(1, state, True)[0]
+            action = self.choose_action(step, state, True)[0]
             next_state, rew, terminated, truncated, _ = env.step(action)
             done = terminated or truncated 
             state = next_state
             rewards.append(rew)
+            actions.append(action)
+            step += 1 
         env.close()
-        return rewards
+        return rewards, actions
     
 
 
@@ -199,7 +202,7 @@ def training_loop(env, agent, max_episodes, target_ = False, seed=42, batch_size
     
     for step in range(max_episodes):
         
-        action, epsilon = agent.choose_action(1, obs)
+        action, epsilon = agent.choose_action(step, obs)
        
         new_obs, rew, terminated, truncated, _ = env.step(action)
         done = terminated or truncated        
