@@ -22,10 +22,12 @@ class ExperienceReplay:
         print('Please wait, the experience replay buffer will be filled with random transitions')
                 
         obs, _ = self.env.reset()
+        obs = [*obs[:4], obs[5], *obs[7:]]
         for _ in range(self.min_replay_size):
             
             action = (np.random.random()-.5)*2
             new_obs, rew, terminated, truncated, _ = env.step(action)
+            new_obs = [*new_obs[:4], new_obs[5], *new_obs[7:]]
             done = terminated or truncated
 
             transition = (obs, action, rew, done, new_obs)
@@ -34,6 +36,7 @@ class ExperienceReplay:
     
             if done:
                 obs, _ = env.reset()
+                obs = [*obs[:4], obs[5], *obs[7:]]
         
         print('Initialization with random transitions is done!')
       
@@ -76,32 +79,44 @@ class DQN(nn.Module):
     def __init__(self, env, learning_rate):
         
         super(DQN,self).__init__()
-        input_features = env.observation_space.shape[0]
+        input_features = env.observation_space.shape[0]-2
+        # self.layers = nn.Sequential(
+        #     nn.Linear(in_features=input_features, out_features=32),
+        #     nn.Tanh(),
+        #     nn.Linear(in_features=32, out_features=128),
+        #     nn.Tanh(),
+        #     nn.Linear(in_features=128, out_features=64),
+        #     nn.Tanh(),
+        #     nn.Linear(in_features=64, out_features=32),
+        #     nn.Tanh(),
+        #     nn.Linear(in_features=32, out_features=1)
+        # )
+        self.layers = nn.Sequential(
+            nn.Linear(in_features=input_features, out_features=8),
+            nn.Tanh(),
+            nn.Linear(in_features=8, out_features=16),
+            nn.Tanh(),
+            nn.Linear(in_features=16, out_features=8),
+            nn.Tanh(),
+            nn.Linear(in_features=8, out_features=2),
+            nn.Tanh(),
+            nn.Linear(in_features=2, out_features=1)
+        )
         
-        self.dense1 = nn.Linear(in_features = input_features, out_features = 128)
-        self.dense2 = nn.Linear(in_features = 128, out_features = 64)
-        self.dense3 = nn.Linear(in_features = 64, out_features = 32)
-        self.dense4 = nn.Linear(in_features = 32, out_features=1)
-        
-        self.optimizer = optim.Adam(self.parameters(), lr = learning_rate)
+        self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         
     def forward(self, x):
-        x = torch.tanh(self.dense1(x))
-        x = torch.tanh(self.dense2(x))
-        x = torch.tanh(self.dense3(x))
-        x = self.dense4(x)
-        x = F.softmax(x)
-        
+        x = self.layers(x)
+        x = torch.sigmoid(x)
         return x
     
 
 
 class DDQNAgent:
     
-    def __init__(self, data_path, device, epsilon_decay, 
+    def __init__(self, device, epsilon_decay, 
                  epsilon_start, epsilon_end, discount_rate, lr, buffer_size, seed = 123):
-        self.env_name = data_path
-        # self.env = Electric_Car(path_to_test_data=data_path)
+        
         self.device = device
         self.epsilon_decay = epsilon_decay
         self.epsilon_start = epsilon_start
@@ -110,19 +125,15 @@ class DDQNAgent:
         self.learning_rate = lr
         self.buffer_size = buffer_size
         
-        # self.replay_memory = ExperienceReplay(self.env, self.buffer_size, seed = seed)
-        # self.online_network = DQN(self.env, self.learning_rate).to(self.device)
-        
-        # self.target_network = DQN(self.env, self.learning_rate).to(self.device)
-        # self.target_network.load_state_dict(self.online_network.state_dict())
-        
 
-    def init_envs(self, env):
-        self.env = env
-        self.replay_memory =  ExperienceReplay(env, self.buffer_size)
+    def init_envs(self, train_env, test_env):
+        self.train_env = train_env
+        self.test_env = test_env
+
+        self.replay_memory =  ExperienceReplay(train_env, self.buffer_size)
         
-        self.online_network = DQN(env, self.learning_rate).to(self.device)        
-        self.target_network = DQN(env, self.learning_rate).to(self.device)
+        self.online_network = DQN(train_env, self.learning_rate).to(self.device)        
+        self.target_network = DQN(train_env, self.learning_rate).to(self.device)
         self.target_network.load_state_dict(self.online_network.state_dict())
     
     def choose_action(self, step, observation, greedy = False):
@@ -174,22 +185,24 @@ class DDQNAgent:
     def load(self, path):
         self.target_network.load_state_dict(torch.load(path))
 
-    def play_game(self, env):
+    def play_game(self):
         rewards = []
         actions = []
         done = False
         step = 0
-        state, _ = env.reset()
+        state, _ = self.test_env.reset()
+        state = [*state[:4], state[5], *state[7:]]
         while not done:
         
             action = self.choose_action(step, state, True)[0]
-            next_state, rew, terminated, truncated, _ = env.step(action)
+            next_state, rew, terminated, truncated, _ = self.test_env.step(action)
+            next_state = [*next_state[:4], next_state[5], *next_state[7:]]
             done = terminated or truncated 
             state = next_state
             rewards.append(rew)
             actions.append(action)
             step += 1 
-        env.close()
+        self.test_env.close()
         return rewards, actions
     
 
@@ -197,7 +210,8 @@ class DDQNAgent:
 def training_loop(env, agent, max_episodes, target_ = False, seed=42, batch_size=32):
     
     obs, _ = env.reset()
-    average_reward_list = [0]
+    obs = [*obs[:4], obs[5], *obs[7:]]
+    average_reward_list = deque([], maxlen=100)
     episode_reward = 0.0
     
     for step in range(max_episodes):
@@ -205,6 +219,7 @@ def training_loop(env, agent, max_episodes, target_ = False, seed=42, batch_size
         action, epsilon = agent.choose_action(step, obs)
        
         new_obs, rew, terminated, truncated, _ = env.step(action)
+        new_obs = [*new_obs[:4], new_obs[5], *new_obs[7:]]
         done = terminated or truncated        
         transition = (obs, action, rew, done, new_obs)
         agent.replay_memory.add_data(transition)
@@ -215,6 +230,7 @@ def training_loop(env, agent, max_episodes, target_ = False, seed=42, batch_size
         if done:
         
             obs, _ = env.reset()
+            obs = [*obs[:4], obs[5], *obs[7:]]
             agent.replay_memory.add_reward(episode_reward)
             episode_reward = 0.0
 
@@ -234,7 +250,7 @@ def training_loop(env, agent, max_episodes, target_ = False, seed=42, batch_size
                 agent.update_target_network()
     
         #Print some output
-        if (step+1) % 10000 == 0:
+        if (step+1) % 100 == 0:
             print(20*'--')
             print('Step', step)
             print('Epsilon', epsilon)
