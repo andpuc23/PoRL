@@ -19,17 +19,18 @@ class TabularQLearning():
         self.discount_rate = discount_rate
         self.bin_size = bin_size
         self.env = Electric_Car(path_to_test_data=data_path)
-        self.action_space = self.env.continuous_action_space
-
-        self.bins_action_space = np.linspace(self.env.continuous_action_space.low[0], self.env.continuous_action_space.high[0], self.bin_size)
+        self.action_space = np.linspace(self.env.continuous_action_space.low[0], self.env.continuous_action_space.high[0], 20)
+        #self.action_space = self.env.continuous_action_space
+        #self.bins_action_space = np.linspace(self.env.continuous_action_space.low[0], self.env.continuous_action_space.high[0], self.bin_size)
+        
         self.bins_battery = np.linspace(0, self.env.battery_capacity, self.bin_size) 
         #self.bins_price = np.linspace(0, np.percentile(self.env.price_values, 0.99), self.bin_size) 
         self.bins_price = np.linspace(0, np.max(self.env.price_values), self.bin_size) 
         self.bins = [self.bins_battery, self.bins_price]
         
-        print('bins_actions', self.bins_action_space)
-        print('bins_battery', self.bins_battery)
-        print('bins_price', self.bins_price)
+        #print('bins_actions', self.bins_action_space)
+        #print('bins_battery', self.bins_battery)
+        #print('bins_price', self.bins_price)
         #print('bins', self.bins)
     
     def discretize_state(self, state):
@@ -51,6 +52,7 @@ class TabularQLearning():
         
         digitized_state.extend(state[len(self.bins):])
         digitized_state = np.array(digitized_state).astype(int)
+        
         return digitized_state
     
     def discretize_action(self, action): 
@@ -77,9 +79,9 @@ class TabularQLearning():
         self.state_vars_qtable = [0, 1, 2, 3, 5]
         
         #!!! welke variablelen?
-        #!!! waarom bin size -1
         #self.Qtable = np.zeros((self.state_space, self.state_space, 24, 7, 365, 12, 3, 2, self.state_space)) 
-        self.Qtable = np.zeros((self.state_space, self.state_space, 24, 7, 12, self.state_space))
+        
+        self.Qtable = np.zeros((self.state_space, self.state_space, 24, 7, 12, 20))
         #self.Qtable = np.zeros((self.bin_size, self.bin_size, 24, 7, 12, self.bin_size)) 
 
 
@@ -135,29 +137,24 @@ class TabularQLearning():
             if adaptive_epsilon:
                 self.epsilon = np.interp(i, [0, self.epsilon_decay], [self.epsilon_start, self.epsilon_end])
 
-            while not done:
-                print('whole state', state)
-                print('part of state', state[self.state_vars_qtable])
-                print('shape action bins', self.bins_action_space.shape)
-                
+            while not done:                
                 if np.random.uniform(0,1) > 1-self.epsilon:
-                    action = self.env.continuous_action_space.sample()
+                    action = np.random.choice(self.action_space)
                 else: 
                     idx_action = np.argmax(self.Qtable[tuple(state[self.state_vars_qtable])])
-                    action = (self.bins_action_space[idx_action]+self.bins_action_space[idx_action]) /2
+                    action = self.action_space[idx_action]
                 
                 next_state, reward, terminated, truncated, info = self.env.step(action)
-                action = self.discretize_action(action)
                 done =  terminated or truncated
-                
                 next_state = self.discretize_state(next_state)
+                idx_action = np.where(self.action_space==action)
 
                 Q_target = (reward + self.discount_rate*np.max(self.Qtable[next_state[self.state_vars_qtable]]))
-                delta = self.learning_rate * (Q_target - self.Qtable[tuple(state[self.state_vars_qtable])+ (action,)])
-                self.Qtable[tuple(state[self.state_vars_qtable])+ (action,)] = self.Qtable[tuple(state[self.state_vars_qtable])+ (action,)] + delta
+                delta = self.learning_rate * (Q_target - self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)])
+                self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] = self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] + delta
                 
                 total_rewards += reward
-                state = next_state      
+                state = next_state
             
             if adapting_learning_rate:
                 self.learning_rate = self.learning_rate/np.sqrt(i+1)
