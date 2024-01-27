@@ -13,6 +13,7 @@ class Electric_Car(gym.Env):
         self.timestamps = self.test_data['PRICES']
         self.state = np.empty(8)
         self.observation_space = self.state
+        self.battery_valuation = self.battery_val() #list of mean price per month (0=jan, ...)
 
         # Battery characteristics
         self.battery_capacity = 50  # kWh
@@ -28,10 +29,20 @@ class Electric_Car(gym.Env):
         self.hour = 1
         self.day = 1
         self.car_is_available = True
+        
+    def battery_val(self):
+        result = []
+        for i in range(12):
+            self.test_data['PRICES'] = pd.to_datetime(self.test_data['PRICES'])
+            data_month = self.test_data[self.test_data['PRICES'].dt.month == i + 1] 
+            month_data = data_month.iloc[:, 1:25].to_numpy()
+            result.append(month_data.mean())
+        return result
 
     def step(self, action):
 
         action = np.squeeze(action)  # Remove the extra dimension
+        
 
         if action <-1 or action >1:
             raise ValueError('Action must be between -1 and 1')
@@ -72,7 +83,7 @@ class Electric_Car(gym.Env):
             charged_electricity_kW = action * self.max_power
             charged_electricity_costs = charged_electricity_kW * self.price_values[self.day - 1][
                 self.hour - 1] * 2 * 1e-3
-            reward = -charged_electricity_costs
+            reward = -charged_electricity_costs + (charged_electricity_kW*self.battery_valuation[int(self.state[5]-1)] * 1e-3)
             self.battery_level += charged_electricity_kW * self.charge_efficiency
 
         # Calculate the profits and battery level when discharging (action <0)
@@ -82,7 +93,7 @@ class Electric_Car(gym.Env):
             discharged_electricity_kWh = action * self.max_power  # Negative discharge value
             discharged_electricity_profits = abs(discharged_electricity_kWh) * self.discharge_efficiency * \
                                              self.price_values[self.day - 1][self.hour - 1] * 1e-3
-            reward = discharged_electricity_profits
+            reward = discharged_electricity_profits - (discharged_electricity_kWh*self.battery_valuation[int(self.state[5]-1)] * 1e-3)
             self.battery_level += discharged_electricity_kWh
             # Some small numerical errors causing the battery level to be 1e-14 to 1e-17 under 0 :
             if self.battery_level < 0:
@@ -125,7 +136,8 @@ class Electric_Car(gym.Env):
         self.state = np.array(
             [battery_level, price, int(hour), int(day_of_week), int(day_of_year), int(month), int(year),
              int(self.car_is_available)])
-
+        #print('test obs', self.state) #!!! Waarom geen integers?
+        
         return self.state
     
 
