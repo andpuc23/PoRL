@@ -57,7 +57,7 @@ class TabularQLearning():
         # Change hour (index 2) from [1, ..., 24] to [0, ..., 23]
         # Change month (index 5) from [1, ..., 12] to [0, ..., 11]
         digitized_state[2]-=1
-        digitized_state[5]-=1
+        #digitized_state[5]-=1
         
         return digitized_state
     
@@ -68,9 +68,9 @@ class TabularQLearning():
         '''
         
         self.state_space = self.bin_size - 1
-        self.state_vars_qtable = [0, 1, 2, 3, 5] # Indices of variables used in the Q-table
+        self.state_vars_qtable = [0, 1, 2]#3, 5] # Indices of variables used in the Q-table
        
-        self.Qtable = np.zeros((self.bin_size, self.bin_size, 24, 7, 12, 21))
+        self.Qtable = np.zeros((self.bin_size, self.bin_size, 24, 21))#7, 12, 21))
 
     def train(self, simulations, simulations_per_avg, learning_rate, epsilon, epsilon_decay, adaptive_epsilon, 
               adapting_learning_rate):
