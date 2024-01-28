@@ -174,7 +174,7 @@ class TabularQLearning():
         # Run the environment for 1 episode
         while not done:
             state = test_env.observation()
-            state.append(state)
+            states.append(state)
             state = self.discretize_state(state)
             idx_action = np.argmax(self.Qtable[tuple(state[self.state_vars_qtable])])
             action = self.action_space[idx_action]
