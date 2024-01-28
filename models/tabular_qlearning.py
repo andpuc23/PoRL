@@ -165,25 +165,32 @@ class TabularQLearning():
         # Make eval env which renders when taking a step
         test_env = Electric_Car_Test(data_test)
         state = test_env.reset()[0]
+        states = []
         rewards = []
+        actions = []
+        infos = []
         done=False
         
         # Run the environment for 1 episode
         while not done:
+            state = test_env.observation()
+            state.append(state)
             state = self.discretize_state(state)
-            print(state)
             idx_action = np.argmax(self.Qtable[tuple(state[self.state_vars_qtable])])
             action = self.action_space[idx_action]
             next_state, reward, terminated, truncated, info = test_env.step(action)
             #next_state = self.discretize_state(next_state)
             done = terminated or truncated
             state = next_state
+            actions.append(action)
+            infos.append(infos)
             rewards.append(reward)
+            states
         #test_env.close()   
         #plt.scatter(range(len(rewards)), rewards)
         #plt.title('Rewards durnig test')
         #plt.show()
-        return
+        return actions, rewards, states, infos
     
     def save_Qtable(self, file):
         np.save(file, self.Qtable)
