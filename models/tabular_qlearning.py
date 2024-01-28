@@ -4,10 +4,12 @@ import time
 import matplotlib.pyplot as plt
 import time
 import random
-from envs.train_env import Electric_Car
+from envs.train_env import Electric_Car 
+from envs.test_env import Electric_Car as Electric_Car_Test
+import torch
 
 class TabularQLearning():
-    def __init__(self, data_path, discount_rate = 0.2, bin_size = 20):
+    def __init__(self, data_path_train, discount_rate, bin_size):
         
         '''
         Params:
@@ -18,19 +20,17 @@ class TabularQLearning():
         
         self.discount_rate = discount_rate
         self.bin_size = bin_size
-        self.env = Electric_Car(path_to_test_data=data_path)
-        self.action_space = np.linspace(self.env.continuous_action_space.low[0], self.env.continuous_action_space.high[0], 21)
-        #self.action_space = self.env.continuous_action_space
-        #self.bins_action_space = np.linspace(self.env.continuous_action_space.low[0], self.env.continuous_action_space.high[0], self.bin_size)
+        self.env = Electric_Car(path_to_test_data=data_path_train)
         
+        # Discretize the action space into [-1.0, -0.9, ..., 1]
+        self.action_space = np.linspace(self.env.continuous_action_space.low[0], self.env.continuous_action_space.high[0], 21)
+ 
+        # Bins of battery are linear from 0 until 50 kWh
         self.bins_battery = np.linspace(0, self.env.battery_capacity, self.bin_size) 
+        # Bins of price are linear between 0 and the 0.9 quantile of all prices, the last bin contain all higher values
         self.bins_price = np.append(np.linspace(0, np.percentile(self.env.price_values, 90), self.bin_size-1),np.max(self.env.price_values)) 
         self.bins = [self.bins_battery, self.bins_price]
         
-        #print('bins_actions', self.bins_action_space)
-        #print('bins_battery', self.bins_battery)
-        #print('bins_price', self.bins_price)
-        #print('bins', self.bins)
     
     def discretize_state(self, state):
         
@@ -50,29 +50,16 @@ class TabularQLearning():
         for i in range(len(self.bins)):
             digitized_state.append(np.digitize(self.state[i], self.bins[i])-1)
         
+        # Add the other variables
         digitized_state.extend(state[len(self.bins):])
         digitized_state = np.array(digitized_state).astype(int)
         
-        # Change hour (index 2): 1, ..., 24 to 0, ..., 23
-        # Change month (index 5): 1, ..., 12 to 0, ..., 11
+        # Change hour (index 2) from [1, ..., 24] to [0, ..., 23]
+        # Change month (index 5) from [1, ..., 12] to [0, ..., 11]
         digitized_state[2]-=1
         digitized_state[5]-=1
         
         return digitized_state
-    
-    def discretize_action(self, action): 
-        '''
-        Params:
-        action = action that needs to be discretized
-        
-        Returns:
-        discretized action
-        '''
-        
-        self.action = action 
-        digitized_action = np.digitize(self.action, self.bins_action_space)-1
-        
-        return digitized_action
     
     def create_Q_table(self):
         '''
@@ -82,13 +69,11 @@ class TabularQLearning():
         
         self.state_space = self.bin_size - 1
         self.state_vars_qtable = [0, 1, 2, 3, 5] # Indices of variables used in the Q-table
-        
-        #self.Qtable = np.zeros((self.state_space, self.state_space, 24, 7, 365, 12, 3, 2, self.state_space)) 
-        #self.Qtable = np.zeros((self.bin_size, self.bin_size, 24, 7, 12, self.bin_size)) 
+       
         self.Qtable = np.zeros((self.bin_size, self.bin_size, 24, 7, 12, 21))
 
-    def train(self, simulations, learning_rate, epsilon = 0.05, epsilon_decay = 100, adaptive_epsilon = True, 
-              adapting_learning_rate = False):
+    def train(self, simulations, simulations_per_avg, learning_rate, epsilon, epsilon_decay, adaptive_epsilon, 
+              adapting_learning_rate):
         
         '''
         Params:
@@ -105,7 +90,8 @@ class TabularQLearning():
         self.epsilon_decay = epsilon_decay
         self.learning_rate = learning_rate
         self.epsilon_start = 1
-        self.epsilon_end = 0.05
+        self.epsilon_end = epsilon
+        self.sims_per_avg = simulations_per_avg
 
         self.rewards = []
         self.average_rewards = []
@@ -115,8 +101,8 @@ class TabularQLearning():
             self.learning_rate = 1
         
         for i in range(simulations):
-            #if i % 5000 == 0:
-            #    print(f'Please wait, the algorithm is learning! The current simulation is {i}')
+            if i % self.sims_per_avg == 0:
+                print(f'Please wait, the algorithm is learning! The current simulation is {i}')
             
             done = False
             
@@ -157,18 +143,44 @@ class TabularQLearning():
                 self.learning_rate = self.learning_rate/np.sqrt(i+1)
             
             self.rewards.append(total_rewards)
-            print(total_rewards)
-            print(self.epsilon)
 
-            if i % 100 == 0:
+            if i % self.sims_per_avg == 0:
                 self.average_rewards.append(np.mean(self.rewards))
                 self.rewards = []
             
         print('The simulation is done!')
-        return self.Qtable
+        return self.Qtable, self.rewards, self.average_rewards
         
     def visualize_rewards(self):
-        pass
+        plt.figure(figsize =(7.5,7.5))
+        plt.plot(self.sims_per_avg*(np.arange(len(self.average_rewards))+1), self.average_rewards)
+        #plt.axhline(y = -110, color = 'r', linestyle = '-')
+        plt.title('Average reward over the past 100 simulations', fontsize = 10)
+        #plt.legend(['Q-learning performance','Benchmark'])
+        plt.xlabel('Number of simulations', fontsize = 10)
+        plt.ylabel('Average reward', fontsize = 10)
+        plt.show()
             
-    def play_game(self):
-        pass
+    def test(self, data_test):
+        # Make eval env which renders when taking a step
+        test_env = Electric_Car_Test(path_to_test_data=data_test)
+        state = test_env.reset()[0]
+        rewards = []
+        done=False
+        
+        # Run the environment for 1 episode
+        while not done:
+            state = self.discretize_state(state)
+            idx_action = np.argmax(self.Qtable[tuple(state[self.state_vars_qtable])])
+            action = self.action_space[idx_action]
+            next_state, reward, terminated, truncated, info = test_env.step(action)
+            done = terminated or truncated
+            state = next_state
+            rewards.append(reward)
+        #test_env.close()
+        
+        #plt.scatter(range(len(rewards)), rewards)
+        #plt.title('Rewards durnig test')
+        #plt.show()
+        
+        return 
