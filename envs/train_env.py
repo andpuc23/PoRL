@@ -83,7 +83,8 @@ class Electric_Car(gym.Env):
             charged_electricity_kW = action * self.max_power
             charged_electricity_costs = charged_electricity_kW * self.price_values[self.day - 1][
                 self.hour - 1] * 2 * 1e-3
-            reward = -charged_electricity_costs + (charged_electricity_kW*self.battery_valuation[int(self.state[5]-1)] * 1e-3)
+            valuation_battery = charged_electricity_kW*self.battery_valuation[int(self.state[5]-1)] * 1e-3
+            reward = -charged_electricity_costs + valuation_battery
             self.battery_level += charged_electricity_kW * self.charge_efficiency
 
         # Calculate the profits and battery level when discharging (action <0)
@@ -93,7 +94,8 @@ class Electric_Car(gym.Env):
             discharged_electricity_kWh = action * self.max_power  # Negative discharge value
             discharged_electricity_profits = abs(discharged_electricity_kWh) * self.discharge_efficiency * \
                                              self.price_values[self.day - 1][self.hour - 1] * 1e-3
-            reward = discharged_electricity_profits - (discharged_electricity_kWh*self.battery_valuation[int(self.state[5]-1)] * 1e-3)
+            valuation_battery = discharged_electricity_kWh*self.battery_valuation[int(self.state[5]-1)] * 1e-3
+            reward = discharged_electricity_profits - valuation_battery
             self.battery_level += discharged_electricity_kWh
             # Some small numerical errors causing the battery level to be 1e-14 to 1e-17 under 0 :
             if self.battery_level < 0:
@@ -136,7 +138,6 @@ class Electric_Car(gym.Env):
         self.state = np.array(
             [battery_level, price, int(hour), int(day_of_week), int(day_of_year), int(month), int(year),
              int(self.car_is_available)])
-        #print('test obs', self.state) #!!! Waarom geen integers?
         
         return self.state
     

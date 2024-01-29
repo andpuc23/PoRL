@@ -9,7 +9,7 @@ from envs.test_env import Electric_Car as Electric_Car_Test
 import torch
 
 class TabularQLearning():
-    def __init__(self, data_path_train, discount_rate, bin_size):
+    def __init__(self, data_path_train, discount_rate, bin_size, state_vars_qtable):
         
         '''
         Params:
@@ -21,16 +21,22 @@ class TabularQLearning():
         self.discount_rate = discount_rate
         self.bin_size = bin_size
         self.env = Electric_Car(path_to_test_data=data_path_train)
+        self.state_vars_qtable = state_vars_qtable
         
-        # Discretize the action space into [-1.0, -0.9, ..., 1]
-        self.action_space = np.linspace(self.env.continuous_action_space.low[0], self.env.continuous_action_space.high[0], 21)
+        # Discretize the action space
+        self.action_space = np.linspace(self.env.continuous_action_space.low[0], self.env.continuous_action_space.high[0], self.bin_size[-1])
+        self.bins = []
  
-        # Bins of battery are linear from 0 until 50 kWh
-        self.bins_battery = np.linspace(0, self.env.battery_capacity, self.bin_size) 
-        # Bins of price are linear between 0 and the 0.9 quantile of all prices, the last bin contain all higher values
-        self.bins_price = np.append(np.linspace(0, np.percentile(self.env.price_values, 90), self.bin_size-1),np.max(self.env.price_values)) 
-        self.bins = [self.bins_battery, self.bins_price]
-        
+        for i in self.state_vars_qtable:
+            if i == 0: # Battery
+                bins_feature = np.linspace(0, self.env.battery_capacity, self.bin_size[0]) 
+                
+            elif i==1: # Price
+                bins_feature = np.append(np.linspace(0, np.percentile(self.env.price_values, 90),
+                                                        self.bin_size[1]-1),np.max(self.env.price_values)) 
+            elif i==2: # Hour
+                bins_feature = np.linspace(1, 24, self.bin_size[2]) 
+            self.bins.append(bins_feature)        
     
     def discretize_state(self, state):
         
@@ -46,6 +52,11 @@ class TabularQLearning():
         self.state = state
         digitized_state = []
         
+        # Change hour (index 2) from [1, ..., 24] to [0, ..., 23]
+        # Change month (index 5) from [1, ..., 12] to [0, ..., 11]
+        #digitized_state[2]-=1
+        #digitized_state[5]-=1
+        
         # Discretize the continuous variables battery (index 0) and price (index 1)
         for i in range(len(self.bins)):
             digitized_state.append(np.digitize(self.state[i], self.bins[i])-1)
@@ -54,11 +65,6 @@ class TabularQLearning():
         digitized_state.extend(state[len(self.bins):])
         digitized_state = np.array(digitized_state).astype(int)
         
-        # Change hour (index 2) from [1, ..., 24] to [0, ..., 23]
-        # Change month (index 5) from [1, ..., 12] to [0, ..., 11]
-        digitized_state[2]-=1
-        #digitized_state[5]-=1
-        
         return digitized_state
     
     def create_Q_table(self):
@@ -66,11 +72,9 @@ class TabularQLearning():
         Returns:
         Q-table with zeros
         '''
-        
-        self.state_space = self.bin_size - 1
-        self.state_vars_qtable = [0, 1, 2]#3, 5] # Indices of variables used in the Q-table
-       
-        self.Qtable = np.zeros((self.bin_size, self.bin_size, 24, 21))#7, 12, 21))
+              
+        self.Qtable = np.zeros(self.bin_size)#7, 12, 21))
+        self.Qtable_updates = self.Qtable.copy()
 
     def train(self, simulations, simulations_per_avg, learning_rate, epsilon, epsilon_decay, adaptive_epsilon, 
               adapting_learning_rate):
@@ -135,6 +139,7 @@ class TabularQLearning():
                 delta = self.learning_rate * (Q_target - self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)])
                 
                 self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] = self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] + delta
+                self.Qtable_updates[tuple(state[self.state_vars_qtable]) + (idx_action,)] += 1
                 
                 total_rewards += reward
                 state = next_state
@@ -146,16 +151,17 @@ class TabularQLearning():
 
             if i % self.sims_per_avg == 0:
                 self.average_rewards.append(np.mean(self.rewards))
+                print('Average reward ', np.mean(self.rewards))
                 self.rewards = []
             
         print('The simulation is done!')
-        return self.Qtable, self.rewards, self.average_rewards
+        return self.Qtable, self.Qtable_updates, self.rewards, self.average_rewards
         
     def visualize_rewards(self):
         plt.figure(figsize =(7.5,7.5))
         plt.plot(self.sims_per_avg*(np.arange(len(self.average_rewards))+1), self.average_rewards)
         #plt.axhline(y = -110, color = 'r', linestyle = '-')
-        plt.title('Average reward over the past 100 simulations', fontsize = 10)
+        plt.title('Average reward over the past %d simulations'%self.sims_per_avg, fontsize = 10)
         #plt.legend(['Q-learning performance','Benchmark'])
         plt.xlabel('Number of simulations', fontsize = 10)
         plt.ylabel('Average reward', fontsize = 10)
@@ -185,7 +191,7 @@ class TabularQLearning():
             actions.append(action)
             infos.append(infos)
             rewards.append(reward)
-            states
+
         #test_env.close()   
         #plt.scatter(range(len(rewards)), rewards)
         #plt.title('Rewards durnig test')
