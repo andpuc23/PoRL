@@ -155,7 +155,7 @@ class TabularQLearning():
         plt.figure(figsize =(7.5,7.5))
         plt.plot(self.sims_per_avg*(np.arange(len(self.average_rewards))+1), self.average_rewards)
         #plt.axhline(y = -110, color = 'r', linestyle = '-')
-        plt.title('Average reward over the past 100 simulations', fontsize = 10)
+        plt.title('Average reward over the past %d simulations'%self.sims_per_avg, fontsize = 10)
         #plt.legend(['Q-learning performance','Benchmark'])
         plt.xlabel('Number of simulations', fontsize = 10)
         plt.ylabel('Average reward', fontsize = 10)
