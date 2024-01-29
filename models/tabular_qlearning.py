@@ -7,6 +7,7 @@ import random
 from envs.train_env import Electric_Car 
 from envs.test_env import Electric_Car as Electric_Car_Test
 import torch
+import matplotlib.patches as mpatches
 
 class TabularQLearning():
     def __init__(self, data_path_train, discount_rate, bin_size, state_vars_qtable):
@@ -157,17 +158,22 @@ class TabularQLearning():
         print('The simulation is done!')
         return self.Qtable, self.Qtable_updates, self.rewards, self.average_rewards
         
-    def visualize_rewards(self):
+    def visualize_rewards_and_performance(self):
+        zero = np.count_nonzero(self.Qtable ==0)
+        percent_zero = zero / self.Qtable.size * 100
+        print("The Q table has", zero, "zero values which accounts to", percent_zero, "%")
+
         plt.figure(figsize =(7.5,7.5))
         plt.plot(self.sims_per_avg*(np.arange(len(self.average_rewards))+1), self.average_rewards)
         #plt.axhline(y = -110, color = 'r', linestyle = '-')
-        plt.title('Average reward over the past %d simulations'%self.sims_per_avg, fontsize = 10)
+        plt.title('Average reward over the past" %d simulations'%self.sims_per_avg, fontsize = 10)
         #plt.legend(['Q-learning performance','Benchmark'])
         plt.xlabel('Number of simulations', fontsize = 10)
         plt.ylabel('Average reward', fontsize = 10)
         plt.show()
+
             
-    def play(self, data_test):
+    def play(self, data_test, plotting = True):
         # Make eval env which renders when taking a step
         test_env = Electric_Car_Test(data_test)
         state = test_env.reset()[0]
@@ -189,15 +195,19 @@ class TabularQLearning():
             done = terminated or truncated
             state = next_state
             actions.append(action)
-            infos.append(infos)
+            infos.append(info)
             rewards.append(reward)
 
         #test_env.close()   
         #plt.scatter(range(len(rewards)), rewards)
         #plt.title('Rewards durnig test')
         #plt.show()
+        if (plotting ==True):
+            self.plot(actions, rewards, states, infos)
+
         return actions, rewards, states, infos
     
+
     def save_Qtable(self, file):
         np.save(file, self.Qtable)
         return 
@@ -205,3 +215,127 @@ class TabularQLearning():
     def load_Qtable(self, file):
         self.Qtable = np.load(file)
         return 
+    
+
+    def plot(self, actions, rewards, states, infos, max = 400):
+        batteries = np.array(states)[:, 0]
+        prices = np.array(states)[:, 1]
+        x = range(len(prices))
+        hours = np.array(states)[:, 2]
+
+
+        #The following code creates boolean arrays indicating what the final action is we take, forced buying happens when we do not have 20KwH at 7AM
+        #Needed for colour coding scatter plots conditionally
+        buying = np.full(len(batteries), False, dtype=bool)
+        selling = np.full(len(batteries), False, dtype=bool)
+        forced_charging = np.full(len(batteries), False, dtype=bool)
+        for i in range(len(batteries - 1)):
+            if actions[i] > 0 and infos[i] > 0:
+                buying[i] = True
+            elif infos[i] > 0:
+                forced_charging[i] = True
+            elif infos[i] < 0:
+                selling[i] = True
+
+
+        #Plotting the prices with the actions
+        plt.figure(figsize=(12, 6))
+        plt.ylim(0, 300)
+        plt.xlim(0, max)
+        col = np.where(forced_charging,'darkred', np.where(buying, 'red', np.where(selling, 'green', '#FF000000')))
+        plt.scatter(x, prices, c = col,s = 30, zorder=1)
+        plt.plot(x, prices, zorder =0, alpha=0.8)
+        plt.ylabel('Price in Euro')
+        plt.xlabel('Time')
+        custom_legend = [
+                mpatches.Patch(color='green', label='Selling'),
+                mpatches.Patch(color='red', label='Buying'),
+                mpatches.Patch(color='darkred', label='Forced Charging')
+                ]
+        plt.legend(handles=custom_legend)
+        plt.title('Price and Policy')
+        plt.show()
+
+
+        #The following code creates arrays between timestamps indicating the action taken
+        #Needed to make linecharts with conditional colours
+        f = np.array([False])
+        prev_fc = np.concatenate((f, forced_charging[:-1]), dtype = bool)
+        prev_buy = np.concatenate((f, buying[:-1]), dtype = bool)
+        prev_sell = np.concatenate((f, selling[:-1]), dtype = bool)
+        prev_fc = np.logical_or(forced_charging, prev_fc)
+        prev_buy = np.logical_or(buying, prev_buy)
+        prev_sell = np.logical_or(selling, prev_sell)
+        fc = batteries.copy()
+        buy = batteries.copy()
+        sell = batteries.copy()
+        for i in range (len(batteries)):
+            if prev_fc[i] == False:
+                fc[i] = None
+            if prev_buy[i] == False:
+                buy[i] = None
+            if prev_sell[i] == False:
+                sell[i] = None
+
+
+        #Plotting the Battery and actions
+        plt.figure(figsize=(12, 6))
+        plt.ylim(0, 55)
+        plt.xlim(0, max)
+        col = np.where(forced_charging,'darkred', np.where(buying, 'red', np.where(selling, 'green', '#FF000000')))
+        plt.scatter(x, batteries, c = col, s = 30, zorder=1)
+        plt.plot(x, batteries, zorder = 0)
+        plt.plot(x, buy, alpha=0.8, c = 'red', zorder =1)
+        plt.plot(x, sell, alpha=0.8, c = 'green', zorder =1)
+        plt.plot(x, fc, alpha = 0.8, c = 'darkred', zorder = 1, label='Battery and actions')
+        plt.ylabel('Battery')
+        plt.xlabel('Time')
+        plt.legend(handles=custom_legend)
+        plt.title('Battery and Policy')
+        plt.show()
+
+        plt.figure(figsize=(12,6))
+        hours_forced = np.zeros(24)
+        hours_buying = np.zeros(24)
+        hours_selling = np.zeros(24)
+        for i in range(len(batteries)):
+            if forced_charging[i] == True:
+                hours_forced[int(hours[i])-1] += 1
+            if buying[i] == True:
+                hours_buying[int(hours[i])-1] += 1
+            if selling[i] == True:
+                hours_selling[int(hours[i])-1] += 1
+
+        barWidth = 0.3
+        xpos = np.arange(len(hours_forced))
+        plt.bar(xpos+1.3, hours_forced, width = barWidth, color="darkred", label = 'Forced Charging')
+        plt.bar(xpos+1, hours_buying, width = barWidth,  color="red", label = 'Buying')
+        plt.bar(xpos+0.7, hours_selling, width = barWidth,  color="green", label = 'selling')
+        plt.xticks(xpos+1)
+        plt.legend()
+        plt.xlabel('Hour')
+        plt.ylabel('Count of Actions')
+        plt.title('Actions per Hour')
+        plt.show()
+
+        #Plotting the cumlative reward in given timeframe
+        plt.figure(figsize=(12, 6))
+        cum_rewards = np.cumsum(np.array(rewards))
+        plt.xlim(0, max)
+        plt.ylim(-100, 10)
+        plt.plot(x, cum_rewards, label = 'Cumulative Rewards')
+        plt.xlabel('Time')
+        plt.ylabel('Profit in Euro')
+        plt.title('Cumulative rewards up to t =%i' %max)
+        plt.show()
+
+
+        #Plotting the Total Cumulative Reward
+        plt.figure(figsize=(12, 6))
+        cum_rewards = np.cumsum(np.array(rewards))
+        plt.plot(x, cum_rewards)
+        plt.title('Total Cumulative Rewards | Value = %.2f' % sum(rewards))
+        plt.xlabel('Time')
+        plt.ylabel('Profit in Euro')
+        plt.show()
+

@@ -2,6 +2,7 @@ from models.interface import Model
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 class BaselineModel(Model):
     def __init__(self, env):      
@@ -72,8 +73,11 @@ class BaselineModel(Model):
         batteries = np.array(states)[:, 0]
         prices = np.array(states)[:, 1]
         x = range(len(prices))
+        hours = np.array(states)[:, 2]
 
 
+        #The following code creates boolean arrays indicating what the final action is we take, forced buying happens when we do not have 20KwH at 7AM
+        #Needed for colour coding scatter plots conditionally
         buying = np.full(len(batteries), False, dtype=bool)
         selling = np.full(len(batteries), False, dtype=bool)
         forced_charging = np.full(len(batteries), False, dtype=bool)
@@ -86,29 +90,31 @@ class BaselineModel(Model):
                 selling[i] = True
 
 
+        #Plotting the prices with the actions
         plt.figure(figsize=(12, 6))
         plt.ylim(0, 300)
         plt.xlim(0, max)
         col = np.where(forced_charging,'darkred', np.where(buying, 'red', np.where(selling, 'green', '#FF000000')))
         plt.scatter(x, prices, c = col,s = 30, zorder=1)
-        plt.plot(x, prices, zorder =0, alpha=0.8, label = 'Policy and Price')
+        plt.plot(x, prices, zorder =0, alpha=0.8)
         upper_line = np.full(shape=len(states), fill_value=self.upper_thres, dtype=np.float64)
         lower_line = np.full(shape=len(states), fill_value=self.lower_thres, dtype=np.float64)
         plt.plot(x, upper_line, c= "green", alpha=0.5)
         plt.plot(x, lower_line, c= "red", alpha=0.5, zorder=1)
         plt.ylabel('Price in Euro')
         plt.xlabel('Time')
+        custom_legend = [
+                mpatches.Patch(color='green', label='Selling'),
+                mpatches.Patch(color='red', label='Buying'),
+                mpatches.Patch(color='darkred', label='Forced Charging')
+                ]
+        plt.legend(handles=custom_legend)
+        plt.title('Price and Policy')
         plt.show()
 
 
-
-        plt.figure(figsize=(12, 6))
-        prices = np.array(states)[:, 1]
-        x = range(len(prices))
-        plt.ylim(0, 55)
-        plt.xlim(0, max)
-        col = np.where(forced_charging,'darkred', np.where(buying, 'red', np.where(selling, 'green', '#FF000000')))
-
+        #The following code creates arrays between timestamps indicating the action taken
+        #Needed to make linecharts with conditional colours
         f = np.array([False])
         prev_fc = np.concatenate((f, forced_charging[:-1]), dtype = bool)
         prev_buy = np.concatenate((f, buying[:-1]), dtype = bool)
@@ -116,11 +122,9 @@ class BaselineModel(Model):
         prev_fc = np.logical_or(forced_charging, prev_fc)
         prev_buy = np.logical_or(buying, prev_buy)
         prev_sell = np.logical_or(selling, prev_sell)
-
         fc = batteries.copy()
         buy = batteries.copy()
         sell = batteries.copy()
-
         for i in range (len(batteries)):
             if prev_fc[i] == False:
                 fc[i] = None
@@ -130,47 +134,68 @@ class BaselineModel(Model):
                 sell[i] = None
 
 
-
-
-        #fc[((forced_charging == False) & (forced_charging == False)).all()] = np.nan
-        #buy[((buying == False) & (prev_buy == False)).all()] = np.nan
-        #sell[((selling == False) & (prev_sell == False)).all()] = np.nan
-
+        #Plotting the Battery and actions
+        plt.figure(figsize=(12, 6))
+        plt.ylim(0, 55)
+        plt.xlim(0, max)
+        col = np.where(forced_charging,'darkred', np.where(buying, 'red', np.where(selling, 'green', '#FF000000')))
         plt.scatter(x, batteries, c = col, s = 30, zorder=1)
         plt.plot(x, batteries, zorder = 0)
-
         plt.plot(x, buy, alpha=0.8, c = 'red', zorder =1)
         plt.plot(x, sell, alpha=0.8, c = 'green', zorder =1)
-        plt.plot(x, fc, alpha = 0.8, c = 'darkred', zorder = 1)
-
-        #plt.plot(x, buy, zorder =0, alpha=0.8, c = 'red')
-        #plt.plot(x, sell, zorder =0, alpha=0.8, c = 'green')
+        plt.plot(x, fc, alpha = 0.8, c = 'darkred', zorder = 1, label='Battery and actions')
         plt.ylabel('Battery')
         plt.xlabel('Time')
+        plt.legend(handles=custom_legend)
+        plt.title('Battery and Policy')
         plt.show()
 
+        plt.figure(figsize=(12,6))
+        hours_forced = np.zeros(24)
+        hours_buying = np.zeros(24)
+        hours_selling = np.zeros(24)
+        for i in range(len(batteries)):
+            if forced_charging[i] == True:
+                hours_forced[int(hours[i])-1] += 1
+            if buying[i] == True:
+                hours_buying[int(hours[i])-1] += 1
+            if selling[i] == True:
+                hours_selling[int(hours[i])-1] += 1
 
+        barWidth = 0.3
+        xpos = np.arange(len(hours_forced))
+        plt.bar(xpos+1.3, hours_forced, width = barWidth, color="darkred", label = 'Forced Charging')
+        plt.bar(xpos+1, hours_buying, width = barWidth,  color="red", label = 'Buying')
+        plt.bar(xpos+0.7, hours_selling, width = barWidth,  color="green", label = 'selling')
+        plt.xticks(xpos+1)
+        plt.legend()
+        plt.xlabel('Hour')
+        plt.ylabel('Count of Actions')
+        plt.title('Actions per Hour')
+        plt.show()
 
+        #Plotting the cumlative reward in given timeframe
         plt.figure(figsize=(12, 6))
         cum_rewards = np.cumsum(np.array(rewards))
         plt.xlim(0, max)
         plt.ylim(-100, 10)
-        print(cum_rewards)
-        plt.plot(x, cum_rewards, label = 'Cumulative Rewards Total')
-        plt.legend(fontsize = 12)
+        plt.plot(x, cum_rewards, label = 'Cumulative Rewards')
         plt.xlabel('Time')
         plt.ylabel('Profit in Euro')
+        plt.title('Cumulative rewards up to t =%i' %max)
         plt.show()
 
 
+        #Plotting the Total Cumulative Reward
         plt.figure(figsize=(12, 6))
         cum_rewards = np.cumsum(np.array(rewards))
-        print(cum_rewards)
-        plt.plot(x, cum_rewards, label = 'Cumulative Rewards Total')
-        plt.legend(fontsize = 12)
+        plt.plot(x, cum_rewards)
+        plt.title('Total Cumulative Rewards | Value = %.2f' % sum(rewards))
         plt.xlabel('Time')
         plt.ylabel('Profit in Euro')
         plt.show()
+
+
 
 
 
