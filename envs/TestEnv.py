@@ -4,17 +4,16 @@ import pandas as pd
 
 
 class Electric_Car(gym.Env):
-    def __init__(self, path_to_train_data=str):
+
+    def __init__(self, path_to_test_data=str):
         # Define a continuous action space, -1 to 1. (You can discretize this later!)
         self.continuous_action_space = gym.spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
-        # Define the train data
-        self.train_data = pd.read_excel(path_to_train_data)
-        self.price_values = self.train_data.iloc[:, 1:25].to_numpy()
-        self.timestamps = self.train_data['PRICES']
-        self.state = np.empty(8)
-        self.observation_space = self.state
-        self.battery_valuation = self.battery_val() #list of mean price per month (0=jan, ...)
-        
+        # Define the test data
+        self.test_data = pd.read_excel(path_to_test_data)
+        self.price_values = self.test_data.iloc[:, 1:25].to_numpy()
+        self.timestamps = self.test_data['PRICES']
+        self.state = np.empty(7)
+
         # Battery characteristics
         self.battery_capacity = 50  # kWh
         self.max_power = 25 / 0.9  # kW
@@ -26,31 +25,22 @@ class Electric_Car(gym.Env):
 
         # Time Tracking
         self.counter = 0
-        self.hour = 1
+        self.hour = 0
         self.day = 1
         self.car_is_available = True
-        
-    def battery_val(self):
-        result = []
-        for i in range(12):
-            self.train_data['PRICES'] = pd.to_datetime(self.train_data['PRICES'])
-            data_month = self.train_data[self.train_data['PRICES'].dt.month == i + 1] 
-            month_data = data_month.iloc[:, 1:25].to_numpy()
-            result.append(month_data.mean())
-        return result
 
     def step(self, action):
 
         action = np.squeeze(action)  # Remove the extra dimension
-        
 
         if action <-1 or action >1:
             raise ValueError('Action must be between -1 and 1')
-        initial_action = action
+
         # Calculate if, at 7am and after the chosen action, the battery level will be below the minimum morning level:
-        if self.hour == 7:
-            if action > 0 and self.battery_level < self.minimum_morning_level:
-                if self.battery_level + action * self.max_power * self.charge_efficiency < self.minimum_morning_level:  # If the chosen action will not charge the battery to 20kWh
+        if self.hour == 8:
+            if action > 0 and (self.battery_level < self.minimum_morning_level):
+                if (
+                        self.battery_level + action * self.max_power * self.charge_efficiency) < self.minimum_morning_level:  # If the chosen action will not charge the battery to 20kWh
                     action = (self.minimum_morning_level - self.battery_level) / (
                                 self.max_power * self.charge_efficiency)  # Charge until 20kWh
             elif action < 0:
@@ -66,13 +56,6 @@ class Electric_Car(gym.Env):
                     action = (self.minimum_morning_level - self.battery_level) / (
                                 self.max_power * self.charge_efficiency)
 
-        # There is a 50% chance that the car is unavailable from 8am to 6pm
-        if self.hour == 8:
-            self.car_is_available = np.random.choice([True, False])
-            if not self.car_is_available:
-                self.battery_level -= self.car_use_consumption
-        if self.hour == 18:
-            self.car_is_available = True
         if not self.car_is_available:
             action = 0
 
@@ -82,24 +65,17 @@ class Electric_Car(gym.Env):
                 action = (self.battery_capacity - self.battery_level) / (self.max_power * self.charge_efficiency)
             charged_electricity_kW = action * self.max_power
             charged_electricity_costs = charged_electricity_kW * self.price_values[self.day - 1][
-                self.hour - 1] * 2 * 1e-3
-            
-            valuation_battery = charged_electricity_kW*self.battery_valuation[int(self.state[5]-1)] * 1e-3
-            reward = -charged_electricity_costs + valuation_battery
-            
+                self.hour-1] * 2 * 1e-3
+            reward = -charged_electricity_costs
             self.battery_level += charged_electricity_kW * self.charge_efficiency
-
         # Calculate the profits and battery level when discharging (action <0)
         elif (action < 0) and (self.battery_level >= 0):
             if (self.battery_level + action * self.max_power) < 0:
                 action = -self.battery_level / (self.max_power)
             discharged_electricity_kWh = action * self.max_power  # Negative discharge value
             discharged_electricity_profits = abs(discharged_electricity_kWh) * self.discharge_efficiency * \
-                                             self.price_values[self.day - 1][self.hour - 1] * 1e-3
-            
-            valuation_battery = discharged_electricity_kWh*self.battery_valuation[int(self.state[5]-1)] * 1e-3
-            reward = discharged_electricity_profits + valuation_battery
-            
+                                             self.price_values[self.day - 1][self.hour-1] * 1e-3
+            reward = discharged_electricity_profits
             self.battery_level += discharged_electricity_kWh
             # Some small numerical errors causing the battery level to be 1e-14 to 1e-17 under 0 :
             if self.battery_level < 0:
@@ -111,24 +87,25 @@ class Electric_Car(gym.Env):
         self.counter += 1  # Increase the counter
         self.hour += 1  # Increase the hour
 
+        # There is a 50% chance that the car is unavailable from 8am to 6pm
+        if self.hour == 9:
+            self.car_is_available = np.random.choice([True, False])
+            if not self.car_is_available:
+                self.battery_level -= self.car_use_consumption
+        if self.hour == 19:
+            self.car_is_available = True
+
         if self.counter % 24 == 0:  # If the counter is a multiple of 24, increase the day, reset hour to first hour
             self.day += 1
             self.hour = 1
 
         terminated = self.counter == len(
-            self.price_values.flatten()) - 1  # If the counter is equal to the number of hours in the train data, terminate the episode
+            self.price_values.flatten()) - 1  # If the counter is equal to the number of hours in the test data, terminate the episode
         truncated = False
 
         info = action  # The final action taken after all constraints! For debugging purposes
 
         self.state = self.observation()  # Update the state
-        
-        '''
-        if initial_action != action:
-            reward -= 10
-        if np.isclose(initial_action, 0, 1e-2):
-            reward = -5
-        '''
 
         return self.state, reward, terminated, truncated, info
 
@@ -146,7 +123,6 @@ class Electric_Car(gym.Env):
 
         return self.state
     
-
     def reset(self):
         self.counter = 0
         self.hour = 1

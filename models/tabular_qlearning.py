@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import time
 import random
 from envs.train_env import Electric_Car 
-from envs.test_env import Electric_Car as Electric_Car_Test
+from envs.TestEnv import Electric_Car as Electric_Car_Test
 import torch
 import matplotlib.patches as mpatches
 
@@ -21,24 +21,37 @@ class TabularQLearning():
         
         self.discount_rate = discount_rate
         self.bin_size = bin_size
-        self.env = Electric_Car(path_to_test_data=data_path_train)
+        self.env = Electric_Car(path_to_train_data=data_path_train)
         self.state_vars_qtable = state_vars_qtable
         
         # Discretize the action space
-        self.action_space = np.linspace(self.env.continuous_action_space.low[0], self.env.continuous_action_space.high[0], self.bin_size[-1])
+        self.action_space = np.linspace(-1, 1, self.bin_size[-1])
+        self.bin_size[-1]+=1
         self.bins = []
  
         for i in self.state_vars_qtable:
-            if i == 0: # Battery
-                bins_feature = np.linspace(0, self.env.battery_capacity, self.bin_size[0]) 
-                
-            elif i==1: # Price
-                bins_feature = np.append(np.linspace(0, np.percentile(self.env.price_values, 90),
-                                                        self.bin_size[1]-1),np.max(self.env.price_values)) 
-            elif i==2: # Hour
-                bins_feature = np.linspace(1, 24, self.bin_size[2]) 
-            self.bins.append(bins_feature)        
-    
+            if i == 0: # Battery linspace linear between 0 and 50 kWh, max is in linspace
+                bins_feature = np.linspace(0, self.env.battery_capacity, self.bin_size[i])
+                bins_feature[-1]=np.inf
+            
+            elif i==1: # Price linspace linear between 0 and 90 percentile, everything higher automatically gets a bin
+                #bins_feature = np.append(np.linspace(0, np.percentile(self.env.price_values, 90),
+                                                     #self.bin_size[1]-1),np.max(self.env.price_values)+10000) 
+                #max to right of linspace
+                bins_feature = np.linspace(0, np.percentile(self.env.price_values, 90), self.bin_size[i]-1)
+                np.append(bins_feature,np.inf)
+            elif i==2: # Hour linear between 1 and 24
+                bins_feature = np.linspace(1, 24, self.bin_size[i])
+                bins_feature[-1]=np.inf
+            elif i==3: #Days of the week, weekday or weekend
+                bins_feature = np.array([0, 5, 7])
+                #bins_feature[-1]=np.inf
+            elif i==5: # Month linear between 1 and 12
+                bins_feature = np.linspace(1, 12, self.bin_size[i])
+                bins_feature[-1]=np.inf
+            print(bins_feature)
+            self.bins.append(bins_feature) 
+        
     def discretize_state(self, state):
         
         '''
@@ -58,23 +71,32 @@ class TabularQLearning():
         #digitized_state[2]-=1
         #digitized_state[5]-=1
         
-        # Discretize the continuous variables battery (index 0) and price (index 1)
-        for i in range(len(self.bins)):
-            digitized_state.append(np.digitize(self.state[i], self.bins[i])-1)
+        # Discretize the features of the state
+        bins_idx = 0
+        for i in range(len(self.state)):
+            if i in self.state_vars_qtable:
+                digitized_state.append(np.digitize(self.state[i], self.bins[bins_idx])-1)
+                bins_idx+=1
+            else:
+                digitized_state.append(int(self.state[i]))
         
+        #for i in range(len(self.bins)):
+        #    digitized_state.append(np.digitize(self.state[i], self.bins[i])-1)
+
         # Add the other variables
-        digitized_state.extend(state[len(self.bins):])
-        digitized_state = np.array(digitized_state).astype(int)
+        #digitized_state.extend(state[len(self.bins):])
+        #digitized_state = np.array(digitized_state).astype(int)
         
-        return digitized_state
+        return np.array(digitized_state)
     
     def create_Q_table(self):
         '''
         Returns:
         Q-table with zeros
         '''
-              
-        self.Qtable = np.zeros(self.bin_size)#7, 12, 21))
+        self.state_space = np.array(self.bin_size)-1
+        self.Qtable = np.zeros(self.state_space)#7, 12, 21))
+        print(self.Qtable.shape)
         self.Qtable_updates = self.Qtable.copy()
 
     def train(self, simulations, simulations_per_avg, learning_rate, epsilon, epsilon_decay, adaptive_epsilon, 
@@ -130,7 +152,6 @@ class TabularQLearning():
                     action = self.action_space[idx_action]
                 
                 next_state, reward, terminated, truncated, info = self.env.step(action)
-                
                 next_state = self.discretize_state(next_state)
                 done =  terminated or truncated
                 idx_action = np.where(self.action_space==action)
@@ -171,8 +192,7 @@ class TabularQLearning():
         plt.xlabel('Number of simulations', fontsize = 10)
         plt.ylabel('Average reward', fontsize = 10)
         plt.show()
-
-            
+        
     def play(self, data_test, plotting = True):
         # Make eval env which renders when taking a step
         test_env = Electric_Car_Test(data_test)
