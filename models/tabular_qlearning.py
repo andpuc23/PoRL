@@ -151,8 +151,7 @@ class TabularQLearning():
                 
                 delta = self.learning_rate * (Q_target - self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)])
                 
-                self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] =
-                    self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] + delta
+                self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] = self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] + delta
                 self.Qtable_updates[tuple(state[self.state_vars_qtable]) + (idx_action,)] += 1
                 
                 total_rewards += reward
