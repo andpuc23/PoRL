@@ -25,31 +25,23 @@ class TabularQLearning():
         self.state_vars_qtable = state_vars_qtable
         
         # Discretize the action space
-        self.action_space = np.linspace(-1, 1, self.bin_size[-1])
-        self.bin_size[-1]+=1
+        self.action_space = np.linspace(-1, 1, self.bin_size[-1]-1)
         self.bins = []
  
-        for i in self.state_vars_qtable:
-            if i == 0: # Battery linspace linear between 0 and 50 kWh, max is in linspace
+        for i in range(len(self.state_vars_qtable)):
+            if self.state_vars_qtable[i] == 0: # Battery 
                 bins_feature = np.linspace(0, self.env.battery_capacity, self.bin_size[i])
-                bins_feature[-1]=np.inf
-            
-            elif i==1: # Price linspace linear between 0 and 90 percentile, everything higher automatically gets a bin
-                #bins_feature = np.append(np.linspace(0, np.percentile(self.env.price_values, 90),
-                                                     #self.bin_size[1]-1),np.max(self.env.price_values)+10000) 
-                #max to right of linspace
+                bins_feature[-1]+=0.1
+            elif self.state_vars_qtable[i]==1: # Price 
                 bins_feature = np.linspace(0, np.percentile(self.env.price_values, 90), self.bin_size[i]-1)
-                np.append(bins_feature,np.inf)
-            elif i==2: # Hour linear between 1 and 24
+            elif self.state_vars_qtable[i]==2: # Hour linear between 1 and 24
                 bins_feature = np.linspace(1, 24, self.bin_size[i])
-                bins_feature[-1]=np.inf
-            elif i==3: #Days of the week, weekday or weekend
+                bins_feature[-1]+=0.1
+            elif self.state_vars_qtable[i]==3: #Days of the week, weekday or weekend
                 bins_feature = np.array([0, 5, 7])
-                #bins_feature[-1]=np.inf
-            elif i==5: # Month linear between 1 and 12
+            elif self.state_vars_qtable[i]==5: # Month linear between 1 and 12
                 bins_feature = np.linspace(1, 12, self.bin_size[i])
-                bins_feature[-1]=np.inf
-            print(bins_feature)
+                bins_feature[-1]+=0.1
             self.bins.append(bins_feature) 
         
     def discretize_state(self, state):
@@ -95,8 +87,7 @@ class TabularQLearning():
         Q-table with zeros
         '''
         self.state_space = np.array(self.bin_size)-1
-        self.Qtable = np.zeros(self.state_space)#7, 12, 21))
-        print(self.Qtable.shape)
+        self.Qtable = np.zeros(self.state_space)
         self.Qtable_updates = self.Qtable.copy()
 
     def train(self, simulations, simulations_per_avg, learning_rate, epsilon, epsilon_decay, adaptive_epsilon, 
@@ -160,7 +151,8 @@ class TabularQLearning():
                 
                 delta = self.learning_rate * (Q_target - self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)])
                 
-                self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] = self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] + delta
+                self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] =
+                    self.Qtable[tuple(state[self.state_vars_qtable]) + (idx_action,)] + delta
                 self.Qtable_updates[tuple(state[self.state_vars_qtable]) + (idx_action,)] += 1
                 
                 total_rewards += reward
