@@ -1,4 +1,5 @@
-from . import train_env, test_env
+from envs.train_env import Electric_Car 
+from envs.TestEnv import Electric_Car as Electric_Car_Test
 import numpy as np
 from collections import deque
 
@@ -82,4 +83,4 @@ class DataHelper:
         engineered_observation.append(np.max(self.previous_prices))
         engineered_observation.append(np.std(self.previous_prices))
 
-        return engineered_observation
+        return np.array(engineered_observation)

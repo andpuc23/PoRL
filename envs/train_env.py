@@ -39,6 +39,7 @@ class Electric_Car(gym.Env):
             result.append(month_data.mean())
         return result
 
+
     def step(self, action):
 
         action = np.squeeze(action)  # Remove the extra dimension
@@ -84,8 +85,17 @@ class Electric_Car(gym.Env):
             charged_electricity_costs = charged_electricity_kW * self.price_values[self.day - 1][
                 self.hour - 1] * 2 * 1e-3
             
+            # Reward shaping parameters
             valuation_battery = charged_electricity_kW*self.battery_valuation[int(self.state[5]-1)] * 1e-3
-            reward = -charged_electricity_costs + valuation_battery
+            
+            penalty_morning = 0
+
+            if self.hour == 7 and self.battery_level < 10:
+                penalty_morning = 100
+            if self.hour == 8 and self.battery_level < 20:
+                penalty_8am = 100
+                
+            reward = -charged_electricity_costs + valuation_battery - penalty_morning
             
             self.battery_level += charged_electricity_kW * self.charge_efficiency
 
@@ -96,8 +106,10 @@ class Electric_Car(gym.Env):
             discharged_electricity_kWh = action * self.max_power  # Negative discharge value
             discharged_electricity_profits = abs(discharged_electricity_kWh) * self.discharge_efficiency * \
                                              self.price_values[self.day - 1][self.hour - 1] * 1e-3
-            
+            # Reward shaping parameters
             valuation_battery = discharged_electricity_kWh*self.battery_valuation[int(self.state[5]-1)] * 1e-3
+            
+            
             reward = discharged_electricity_profits + valuation_battery
             
             self.battery_level += discharged_electricity_kWh
@@ -122,13 +134,6 @@ class Electric_Car(gym.Env):
         info = action  # The final action taken after all constraints! For debugging purposes
 
         self.state = self.observation()  # Update the state
-        
-        '''
-        if initial_action != action:
-            reward -= 10
-        if np.isclose(initial_action, 0, 1e-2):
-            reward = -5
-        '''
 
         return self.state, reward, terminated, truncated, info
 
