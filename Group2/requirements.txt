@@ -1,0 +1,7 @@
+pandas
+openpyxl>=3.0.10
+numexpr>=2.8.0
+matplotlib==3.4.3
+numpy==1.26.3
+gymnasium>=0.26
+gym==0.26
