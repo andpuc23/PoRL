@@ -4,10 +4,10 @@ import time
 import matplotlib.pyplot as plt
 import time
 import random
-from train_env import Electric_Car 
+#from train_env import Electric_Car 
 import torch
 import matplotlib.patches as mpatches
-from envs.feature_engineering import DataHelper
+import pandas as pd
 
 class Agent():
     def __init__(self):
@@ -18,16 +18,14 @@ class Agent():
         bin_size = number of bins used for discretizing the state space
         
         '''
-         
+
         self.discount_rate = 0.95
         self.bin_size = [4, 6, 7, 3, 4, 4]  
         
         self.features_qtable = [0, 1, 2, 3, 5] 
-        self.dh = DataHelper()
         
         # Discretize the action space and the state space of specified features
-        self.action_space = np.linspace(-1, 1, self.bin_size[-1]-1)
-        self.make_bins()
+
         
         
     def discretize_state(self, state):
@@ -56,7 +54,7 @@ class Agent():
         return np.array(digitized_state)  
     
     
-    def make_bins():
+    def make_bins(self):
         self.bins = []
  
         for i in range(len(self.features_qtable)):
@@ -108,7 +106,10 @@ class Agent():
         
         '''
         self.env = Electric_Car_Train(path_to_train_data=data_path_train)
-        
+        self.action_space = np.linspace(-1, 1, self.bin_size[-1]-1)
+        self.make_bins()        
+
+
         simulations = 10
         self.epsilon = 0.05
         self.epsilon_decay = simulations
@@ -154,7 +155,7 @@ class Agent():
                 #
                 next_state, reward, terminated, truncated, info = self.env.step(action)
                 done =  terminated or truncated
-                #next_state = dh.process_data(next_state)
+                #next_state = .process_data(next_state)
                 
                 # Discretize the next state and the action
                 next_state = self.discretize_state(next_state)
@@ -184,10 +185,10 @@ class Agent():
         return
         
     def act(self, obs):
-        obs = self.discretize_state(state)
+        obs = self.discretize_state(obs)
             
         # Find optimal action
-        idx_action = np.argmax(self.Qtable[tuple(state[self.features_qtable])])
+        idx_action = np.argmax(self.Qtable[tuple(obs[self.features_qtable])])
         action = self.action_space[idx_action]
 
         return action
@@ -200,7 +201,7 @@ class Agent():
         self.Qtable = np.load(file)
         return 
 
-class Electric_Car_Train(gym.Env):
+class Electric_Car_Train():
     def __init__(self, path_to_train_data=str):
         # Define a continuous action space, -1 to 1. (You can discretize this later!)
         self.continuous_action_space = gym.spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from agent import Agent
 
+
 # Make the excel file as a command line argument, so that you can do: " python3 main.py --excel_file validate.xlsx "
 parser = argparse.ArgumentParser()
 parser.add_argument('--excel_file', type=str, default='validate.xlsx') # Path to the excel file with the test data
@@ -15,7 +16,7 @@ cumulative_reward = []
 battery_level = []
 
 RL_agent=Agent()
-#RL_agent.train('train.xlsx')
+RL_agent.train('train.xlsx')
 
 
 observation = env.observation()
