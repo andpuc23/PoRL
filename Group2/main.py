@@ -2,6 +2,7 @@ from TestEnv import Electric_Car
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
+from agent import Agent
 
 # Make the excel file as a command line argument, so that you can do: " python3 main.py --excel_file validate.xlsx "
 parser = argparse.ArgumentParser()
@@ -13,14 +14,14 @@ total_reward = []
 cumulative_reward = []
 battery_level = []
 
+RL_agent=Agent()
+#RL_agent.train('train.xlsx')
+
+
 observation = env.observation()
 for i in range(730*24 -1): # Loop through 2 years -> 730 days * 24 hours
-    # Choose a random action between -1 (full capacity sell) and 1 (full capacity charge)
-    # action = env.continuous_action_space.sample()
-    # Only choose randomly 1 or -1 or 0
-    action = np.random.choice([-1, 0, 1])
-    # Or choose an action based on the observation using your RL agent!:
-    # action = RL_agent.act(observation)
+    action = RL_agent.act(observation)
+    
     # The observation is the tuple: [battery_level, price, hour_of_day, day_of_week, day_of_year, month_of_year, year]
     next_observation, reward, terminated, truncated, info = env.step(action)
     total_reward.append(reward)

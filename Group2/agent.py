@@ -10,7 +10,7 @@ import matplotlib.patches as mpatches
 from envs.feature_engineering import DataHelper
 
 class Agent():
-    def __init__(self, data_path_train):
+    def __init__(self):
         
         '''
         Params:
@@ -21,7 +21,7 @@ class Agent():
          
         self.discount_rate = 0.95
         self.bin_size = [4, 6, 7, 3, 4, 4]  
-        self.env = Electric_Car_Train(path_to_train_data=data_path_train)
+        
         self.features_qtable = [0, 1, 2, 3, 5] 
         self.dh = DataHelper()
         
@@ -94,7 +94,7 @@ class Agent():
         self.Qtable = np.zeros(self.state_space)
         self.Qtable_updates = self.Qtable.copy()
 
-    def train(self):
+    def train(self, data_path_train):
         
         '''
         Params:
@@ -107,6 +107,7 @@ class Agent():
         adapting_learning_rate = boolean that indicates if the learning rate should be adaptive or not
         
         '''
+        self.env = Electric_Car_Train(path_to_train_data=data_path_train)
         
         simulations = 10
         self.epsilon = 0.05
