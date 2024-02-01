@@ -16,8 +16,10 @@ cumulative_reward = []
 battery_level = []
 
 RL_agent=Agent()
-RL_agent.train('train.xlsx')
 
+# RL_agent.train('train.xlsx')
+# RL_agent.save_Qtable("TestOne")
+RL_agent.load_Qtable("TestOne.npy")
 
 observation = env.observation()
 for i in range(730*24 -1): # Loop through 2 years -> 730 days * 24 hours
